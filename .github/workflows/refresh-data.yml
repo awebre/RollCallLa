@@ -58,6 +58,19 @@ jobs:
           restore-keys: |
             scrape-cache-${{ env.SESSION }}-
 
+      # Mark any orphaned 'running' rows from a crashed-runner / force-cancelled
+      # previous run as 'error' so the next 'finalize' step doesn't accidentally
+      # close out the wrong row. The workflow's concurrency group serializes
+      # refreshes, so anything still 'running' here is by definition abandoned.
+      - name: Reap abandoned ingest_runs rows
+        run: |
+          npx wrangler d1 execute la_vote_tracker --remote --command "
+            UPDATE ingest_runs
+            SET status = 'error', finished_at = datetime('now'),
+                error = 'abandoned (newer run started)'
+            WHERE status = 'running';
+          "
+
       # Record the start of this refresh in ingest_runs so the API can surface
       # a "last refresh" timestamp and the UI can flag stale data. The row gets
       # status='running' first, finalized to 'success' or 'error' at the end.
@@ -114,7 +127,7 @@ jobs:
           npx wrangler d1 execute la_vote_tracker --remote --command "
             UPDATE ingest_runs
             SET finished_at = datetime('now'), status = 'error',
-                error = 'See GitHub Actions run ${{ github.run_id }}'
+                error = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
             WHERE id = (SELECT MAX(id) FROM ingest_runs WHERE status = 'running');
           "
 
