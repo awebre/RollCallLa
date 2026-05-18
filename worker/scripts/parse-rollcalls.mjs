@@ -17,6 +17,7 @@ import { execFileSync } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
 
 import { PDFParse } from 'pdf-parse';
+import { SYNTHETIC_MIN } from '../src/worker/ids.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -245,7 +246,7 @@ const syntheticByKey = new Map();
 const syntheticInserts = [];
 function mintSynthetic(chamber, displayName, normKey) {
     if (syntheticByKey.has(normKey)) return syntheticByKey.get(normKey);
-    const id = 900_000 + syntheticByKey.size + 1;
+    const id = SYNTHETIC_MIN + syntheticByKey.size + 1;
     syntheticByKey.set(normKey, id);
     // Strip any ", X." disambiguator from the display form.
     const cleanLast = displayName.replace(/,\s*[A-Za-z]\.?\s*$/, '').trim();

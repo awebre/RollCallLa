@@ -21,7 +21,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 
-import { categorize } from '../src/worker/categorize.ts';
+import { parseVotePage } from '../src/worker/votepage.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -105,27 +105,9 @@ function decode(s) {
         .trim();
 }
 
-// Vote-page entries look like:
-//   <a href="ViewDocument.aspx?d=1381402"  target="_blank">House Vote on HB 1, CONCUR IN SENATE AMENDMENTS (#1730)</a>
-// Capture: doc_id, chamber word, bill number, description, rc number.
-const VOTE_ROW_RE =
-    /<a\s+href="ViewDocument\.aspx\?d=(\d+)"[^>]*>(House|Senate)\s+Vote\s+on\s+([A-Z]+\s*\d+),\s*([^<(]+?)\s*\(#(\d+)\)\s*<\/a>/g;
-
-function parseVotePage(html, billNumber) {
-    const rows = [];
-    for (const m of html.matchAll(VOTE_ROW_RE)) {
-        const [, docId, chamberWord, refBill, descriptionRaw, rcNum] = m;
-        const description = decode(descriptionRaw);
-        rows.push({
-            doc_id: Number(docId),
-            chamber: chamberWord === 'House' ? 'H' : 'S',
-            rc_number: Number(rcNum),
-            description,
-            category: categorize(description),
-        });
-    }
-    return rows;
-}
+// parseVotePage / VOTE_ROW_RE live in src/worker/votepage.ts so they can be
+// unit-tested with vitest. The .ts import works under Node via the
+// --experimental-strip-types flag set in the `scrape:bills` npm script.
 
 function escSql(v) {
     if (v === null || v === undefined) return 'NULL';

@@ -123,7 +123,7 @@ console.error(`${candidates.length} candidates.`);
 
 console.error('Loading synthetic legislators for predecessor matching...');
 const synthetics = runD1(
-    `SELECT people_id, last_name, role FROM legislators WHERE people_id BETWEEN 900000 AND 999999`,
+    `SELECT people_id, last_name, role FROM legislators WHERE source = 'pdf'`,
 );
 const syntheticByKey = new Map();
 for (const s of synthetics) syntheticByKey.set(`${s.role}|${s.last_name.toLowerCase()}`, s.people_id);
