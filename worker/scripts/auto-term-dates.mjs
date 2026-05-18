@@ -9,7 +9,7 @@
 //
 // Usage:
 //   node --experimental-strip-types scripts/auto-term-dates.mjs
-//   wrangler d1 execute DB --local --file /tmp/term_starts.sql
+//   wrangler d1 execute la_vote_tracker --local --file /tmp/term_starts.sql
 
 import { PDFParse } from 'pdf-parse';
 import { execFileSync } from 'node:child_process';
@@ -21,7 +21,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 
 function runD1(cmd) {
-    const out = execFileSync('npx', ['wrangler', 'd1', 'execute', 'DB', '--local', '--command', cmd, '--json'], {
+    const out = execFileSync('npx', ['wrangler', 'd1', 'execute', 'la_vote_tracker', '--local', '--command', cmd, '--json'], {
         cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
     });
     const jsonStart = out.indexOf('\n[');

@@ -51,7 +51,7 @@ function escSql(v) {
 }
 
 function runD1(cmd) {
-    const out = execFileSync('npx', ['wrangler', 'd1', 'execute', 'DB', '--local', '--command', cmd, '--json'], {
+    const out = execFileSync('npx', ['wrangler', 'd1', 'execute', 'la_vote_tracker', '--local', '--command', cmd, '--json'], {
         cwd: ROOT,
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],

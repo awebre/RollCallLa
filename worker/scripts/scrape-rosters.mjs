@@ -7,7 +7,7 @@
 //
 // Usage:
 //   node scripts/scrape-rosters.mjs > /tmp/rosters.sql
-//   wrangler d1 execute DB --local --file /tmp/rosters.sql
+//   wrangler d1 execute la_vote_tracker --local --file /tmp/rosters.sql
 // Or just:
 //   npm run scrape:rosters
 

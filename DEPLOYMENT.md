@@ -23,15 +23,15 @@ npx wrangler d1 create la-vote-tracker
 # worker/wrangler.jsonc with it. Commit + push that change.
 
 # 3. Apply schema to remote D1
-npx wrangler d1 migrations apply DB --remote
+npx wrangler d1 migrations apply la_vote_tracker --remote
 
 # 4. Seed remote D1 from your local SQL files (one-off — afterwards the cron handles it)
-npx wrangler d1 execute DB --remote --file /tmp/rosters.sql
-npx wrangler d1 execute DB --remote --file /tmp/term_dates.sql
-npx wrangler d1 execute DB --remote --file /tmp/bills_24RS.sql
-npx wrangler d1 execute DB --remote --file /tmp/bills_26RS.sql
-npx wrangler d1 execute DB --remote --file /tmp/rollcall_votes.sql
-npx wrangler d1 execute DB --remote --file /tmp/wiki_terms.sql
+npx wrangler d1 execute la_vote_tracker --remote --file /tmp/rosters.sql
+npx wrangler d1 execute la_vote_tracker --remote --file /tmp/term_dates.sql
+npx wrangler d1 execute la_vote_tracker --remote --file /tmp/bills_24RS.sql
+npx wrangler d1 execute la_vote_tracker --remote --file /tmp/bills_26RS.sql
+npx wrangler d1 execute la_vote_tracker --remote --file /tmp/rollcall_votes.sql
+npx wrangler d1 execute la_vote_tracker --remote --file /tmp/wiki_terms.sql
 
 # 5. First deploy
 npm run deploy
@@ -63,8 +63,8 @@ npm run scrape:terms
 node --experimental-strip-types scripts/scrape-bills.mjs 26RS
 node --experimental-strip-types scripts/parse-rollcalls.mjs
 node scripts/scrape-wiki-terms.mjs
-npx wrangler d1 execute DB --local --file /tmp/rollcall_votes.sql
-npx wrangler d1 execute DB --local --file /tmp/wiki_terms.sql
+npx wrangler d1 execute la_vote_tracker --local --file /tmp/rollcall_votes.sql
+npx wrangler d1 execute la_vote_tracker --local --file /tmp/wiki_terms.sql
 
 # Reset local D1 and re-seed
 npm run db:reset:local

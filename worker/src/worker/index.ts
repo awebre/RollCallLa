@@ -7,7 +7,7 @@ const CACHE = 'public, max-age=60';
 app.get('/api/', (c) => c.json({ name: 'Cloudflare' }));
 
 app.get('/api/sessions', async (c) => {
-    const { results } = await c.env.DB.prepare(
+    const { results } = await c.env.la_vote_tracker.prepare(
         `SELECT session_id, name, year_start, year_end, special FROM sessions ORDER BY year_start DESC, session_id DESC`,
     ).all();
     c.header('cache-control', CACHE);
@@ -20,19 +20,19 @@ app.get('/api/status', async (c) => {
     // becomes "distinct members who voted in this session" — honest about turnover.
     const queries = sessionId
         ? [
-            c.env.DB.prepare(`SELECT COUNT(*) AS n FROM bills WHERE session_id = ?`).bind(sessionId),
-            c.env.DB.prepare(
+            c.env.la_vote_tracker.prepare(`SELECT COUNT(*) AS n FROM bills WHERE session_id = ?`).bind(sessionId),
+            c.env.la_vote_tracker.prepare(
                 `SELECT COUNT(*) AS n FROM roll_calls rc
                  JOIN bills b ON b.bill_id = rc.bill_id
                  WHERE b.session_id = ?`,
             ).bind(sessionId),
-            c.env.DB.prepare(
+            c.env.la_vote_tracker.prepare(
                 `SELECT COUNT(*) AS n FROM votes v
                  JOIN roll_calls rc ON rc.roll_call_id = v.roll_call_id
                  JOIN bills b       ON b.bill_id      = rc.bill_id
                  WHERE b.session_id = ?`,
             ).bind(sessionId),
-            c.env.DB.prepare(
+            c.env.la_vote_tracker.prepare(
                 `SELECT COUNT(DISTINCT v.people_id) AS n FROM votes v
                  JOIN roll_calls rc ON rc.roll_call_id = v.roll_call_id
                  JOIN bills b       ON b.bill_id      = rc.bill_id
@@ -40,12 +40,12 @@ app.get('/api/status', async (c) => {
             ).bind(sessionId),
         ]
         : [
-            c.env.DB.prepare(`SELECT COUNT(*) AS n FROM bills`),
-            c.env.DB.prepare(`SELECT COUNT(*) AS n FROM roll_calls`),
-            c.env.DB.prepare(`SELECT COUNT(*) AS n FROM votes`),
-            c.env.DB.prepare(`SELECT COUNT(*) AS n FROM legislators WHERE active = 1`),
+            c.env.la_vote_tracker.prepare(`SELECT COUNT(*) AS n FROM bills`),
+            c.env.la_vote_tracker.prepare(`SELECT COUNT(*) AS n FROM roll_calls`),
+            c.env.la_vote_tracker.prepare(`SELECT COUNT(*) AS n FROM votes`),
+            c.env.la_vote_tracker.prepare(`SELECT COUNT(*) AS n FROM legislators WHERE active = 1`),
         ];
-    const [bills, rolls, votes, legs] = await c.env.DB.batch(queries);
+    const [bills, rolls, votes, legs] = await c.env.la_vote_tracker.batch(queries);
     c.header('cache-control', CACHE);
     return c.json({
         counts: {
@@ -107,7 +107,7 @@ app.get('/api/legislators', async (c) => {
         ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
         ORDER BY l.last_name, l.first_name
     `;
-    const { results } = await c.env.DB.prepare(sql).bind(...binds).all();
+    const { results } = await c.env.la_vote_tracker.prepare(sql).bind(...binds).all();
     c.header('cache-control', CACHE);
     return c.json({ legislators: results });
 });
@@ -122,14 +122,14 @@ app.get('/api/legislators/:id', async (c) => {
     const sessionClause = sessionId ? 'AND b.session_id = ?' : '';
     const sessionBindsFor = (base: (string | number)[]) => (sessionId ? [...base, sessionId] : base);
 
-    const [profile, tally, partyLine] = await c.env.DB.batch([
-        c.env.DB.prepare(
+    const [profile, tally, partyLine] = await c.env.la_vote_tracker.batch([
+        c.env.la_vote_tracker.prepare(
             `SELECT people_id, first_name, middle_name, last_name, suffix, nickname,
                     party, role, district, active, source, term_source,
                     term_start, term_end, year_elected
              FROM legislators WHERE people_id = ?`,
         ).bind(id),
-        c.env.DB.prepare(
+        c.env.la_vote_tracker.prepare(
             `SELECT vote, COUNT(*) AS n
              FROM votes v
              JOIN roll_calls rc ON rc.roll_call_id = v.roll_call_id
@@ -139,7 +139,7 @@ app.get('/api/legislators/:id', async (c) => {
         ).bind(...sessionBindsFor([id])),
         // For each roll call, % of same-party members who took the same position.
         // Used to surface "party-line" tendency in the summary card.
-        c.env.DB.prepare(
+        c.env.la_vote_tracker.prepare(
             `WITH legi AS (
                 SELECT party, role FROM legislators WHERE people_id = ?
              ),
@@ -249,7 +249,7 @@ app.get('/api/legislators/:id/votes', async (c) => {
         ORDER BY rc.date DESC, rc.roll_call_id DESC
         LIMIT ${limit} OFFSET ${offset}
     `;
-    const { results } = await c.env.DB.prepare(sql).bind(...binds).all();
+    const { results } = await c.env.la_vote_tracker.prepare(sql).bind(...binds).all();
     c.header('cache-control', CACHE);
     return c.json({ votes: results, limit, offset });
 });
@@ -258,15 +258,15 @@ app.get('/api/rollcalls/:id', async (c) => {
     const id = Number(c.req.param('id'));
     if (!Number.isFinite(id)) return c.json({ error: 'bad id' }, 400);
 
-    const [head, members] = await c.env.DB.batch([
-        c.env.DB.prepare(
+    const [head, members] = await c.env.la_vote_tracker.batch([
+        c.env.la_vote_tracker.prepare(
             `SELECT rc.*, b.bill_number, b.title, s.name AS session_name
              FROM roll_calls rc
              JOIN bills b      ON b.bill_id      = rc.bill_id
              JOIN sessions s   ON s.session_id   = b.session_id
              WHERE rc.roll_call_id = ?`,
         ).bind(id),
-        c.env.DB.prepare(
+        c.env.la_vote_tracker.prepare(
             `SELECT v.vote, l.people_id, l.first_name, l.last_name, l.suffix, l.nickname,
                     l.party, l.role, l.district, l.source
              FROM votes v JOIN legislators l ON l.people_id = v.people_id

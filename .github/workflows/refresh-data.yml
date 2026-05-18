@@ -58,28 +58,28 @@ jobs:
         run: node scripts/scrape-rosters.mjs /tmp/rosters.sql
 
       - name: Push rosters to remote D1
-        run: npx wrangler d1 execute DB --remote --file /tmp/rosters.sql
+        run: npx wrangler d1 execute la_vote_tracker --remote --file /tmp/rosters.sql
 
       - name: Scrape Year Elected per member
         run: node scripts/scrape-term-dates.mjs
 
       - name: Push term dates to remote D1
-        run: npx wrangler d1 execute DB --remote --file /tmp/term_dates.sql
+        run: npx wrangler d1 execute la_vote_tracker --remote --file /tmp/term_dates.sql
 
       - name: Scrape bills + roll-call metadata
         run: node --experimental-strip-types scripts/scrape-bills.mjs "$SESSION" "" /tmp/bills.sql
 
       - name: Push bills to remote D1
-        run: npx wrangler d1 execute DB --remote --file /tmp/bills.sql
+        run: npx wrangler d1 execute la_vote_tracker --remote --file /tmp/bills.sql
 
       - name: Parse roll-call PDFs into per-member votes
         run: node --experimental-strip-types scripts/parse-rollcalls.mjs
 
       - name: Push per-member votes to remote D1
-        run: npx wrangler d1 execute DB --remote --file /tmp/rollcall_votes.sql
+        run: npx wrangler d1 execute la_vote_tracker --remote --file /tmp/rollcall_votes.sql
 
       - name: Scrape Wikipedia infoboxes for term_start / term_end
         run: node scripts/scrape-wiki-terms.mjs
 
       - name: Push term provenance to remote D1
-        run: npx wrangler d1 execute DB --remote --file /tmp/wiki_terms.sql
+        run: npx wrangler d1 execute la_vote_tracker --remote --file /tmp/wiki_terms.sql

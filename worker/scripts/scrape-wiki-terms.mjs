@@ -9,7 +9,7 @@
 //
 // Usage:
 //   node scripts/scrape-wiki-terms.mjs           # writes /tmp/wiki_terms.sql
-//   wrangler d1 execute DB --local --file /tmp/wiki_terms.sql
+//   wrangler d1 execute la_vote_tracker --local --file /tmp/wiki_terms.sql
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -36,7 +36,7 @@ function escSql(v) {
 }
 
 function runD1(cmd) {
-    const out = execFileSync('npx', ['wrangler', 'd1', 'execute', 'DB', '--local', '--command', cmd, '--json'], {
+    const out = execFileSync('npx', ['wrangler', 'd1', 'execute', 'la_vote_tracker', '--local', '--command', cmd, '--json'], {
         cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
     });
     const jsonStart = out.indexOf('\n[');
