@@ -15,9 +15,9 @@ export function ProvenanceBadge({ source, term_source, style }: Props) {
                 style={{
                     fontSize: '0.7rem',
                     fontWeight: 600,
-                    color: '#8a4a00',
-                    background: '#fdf3e0',
-                    border: '1px solid #e8c98a',
+                    color: 'var(--app-warn-text-badge)',
+                    background: 'var(--app-warn-bg)',
+                    border: '1px solid var(--app-warn-border)',
                     padding: '0.05rem 0.35rem',
                     borderRadius: 3,
                     marginLeft: '0.4rem',
@@ -33,16 +33,16 @@ export function ProvenanceBadge({ source, term_source, style }: Props) {
         const label = term_source === 'wikipedia' ? 'Term: Wikipedia' : 'Term: derived';
         const title = term_source === 'wikipedia'
             ? 'Term-start date was scraped from Wikipedia, not an official source.'
-            : 'Term-end date was inferred from the successor’s sworn-in date.';
+            : 'Term-end date was inferred from the successor\'s sworn-in date.';
         return (
             <span
                 title={title}
                 style={{
                     fontSize: '0.7rem',
                     fontWeight: 500,
-                    color: '#555',
-                    background: '#f0f0f0',
-                    border: '1px solid #ddd',
+                    color: 'var(--app-badge-text)',
+                    background: 'var(--app-badge-bg)',
+                    border: '1px solid var(--app-badge-border)',
                     padding: '0.05rem 0.35rem',
                     borderRadius: 3,
                     marginLeft: '0.4rem',

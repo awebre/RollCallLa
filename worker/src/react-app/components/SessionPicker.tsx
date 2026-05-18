@@ -5,7 +5,7 @@ export function SessionPicker() {
     const { sessions, current, setCurrent } = useSession();
     if (sessions.length === 0) return null;
     return (
-        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#444' }}>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--app-text-mid)' }}>
             <span style={{ fontFamily: 'Georgia, serif' }}>Session:</span>
             <select
                 value={current?.session_id ?? ''}
@@ -17,8 +17,9 @@ export function SessionPicker() {
                     padding: '0.3rem 0.5rem',
                     fontFamily: 'Georgia, serif',
                     fontSize: '0.9rem',
-                    border: '1px solid #bbb',
-                    background: '#fafaf6',
+                    border: '1px solid var(--app-border-input)',
+                    background: 'var(--app-surface)',
+                    color: 'var(--app-ink)',
                 }}
             >
                 {sessions.map((s) => (

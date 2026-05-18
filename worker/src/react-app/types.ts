@@ -51,18 +51,18 @@ export function formatName(l: { first_name: string; last_name: string; suffix: s
 }
 
 export function partyColor(p: string | null) {
-    if (p === 'D') return '#1f5fa6';
-    if (p === 'R') return '#a32a2a';
-    if (p === 'I') return '#5a5a5a';
-    return '#9a9a9a';
+    if (p === 'D') return 'var(--party-d)';
+    if (p === 'R') return 'var(--party-r)';
+    if (p === 'I') return 'var(--party-i)';
+    return 'var(--party-none)';
 }
 
 export const VOTE_LABEL: Record<number, string> = { 1: 'Yea', 2: 'Nay', 3: 'NV', 4: 'Absent' };
 export function voteColor(v: number) {
-    if (v === 1) return '#1d6b3a';
-    if (v === 2) return '#a32a2a';
-    if (v === 3) return '#7a6a3a';
-    return '#5a5a5a';
+    if (v === 1) return 'var(--vote-yea)';
+    if (v === 2) return 'var(--vote-nay)';
+    if (v === 3) return 'var(--vote-nv)';
+    return 'var(--vote-absent)';
 }
 
 // "24RS" -> "2024 Regular Session"

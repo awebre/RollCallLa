@@ -49,7 +49,7 @@ export function Status() {
     }
 
     return (
-        <p style={{ margin: '0.25rem 0 0', color: '#666', fontSize: '0.85rem', fontFamily: 'ui-monospace, monospace' }}>
+        <p style={{ margin: '0.25rem 0 0', color: 'var(--app-text-muted)', fontSize: '0.85rem', fontFamily: 'ui-monospace, monospace' }}>
             {active_legislators.toLocaleString()} {legLabel} · {bills.toLocaleString()} bills ·{' '}
             {roll_calls.toLocaleString()} roll calls · {votes.toLocaleString()} votes
             {refreshNode}

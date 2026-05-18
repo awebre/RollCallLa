@@ -309,10 +309,10 @@ export function DistrictMap() {
 
     return (
         <>
-            <p style={{ color: '#444', marginTop: 0 }}>
+            <p style={{ color: 'var(--app-text-mid)', marginTop: 0 }}>
                 Browse Louisiana's legislative districts. No address required. We don't ask for or store your location.
             </p>
-            <p style={{ color: '#666', fontSize: '0.85rem', margin: '0 0 1rem' }}>
+            <p style={{ color: 'var(--app-text-muted)', fontSize: '0.85rem', margin: '0 0 1rem' }}>
                 District lines are the post-2022 maps (in force for the 2024 sessions onward). Seat-holders reflect who actually served in the session selected above — mid-session successors are listed in the panel.
             </p>
 
@@ -350,7 +350,7 @@ export function DistrictMap() {
                             // path which keeps the camera still on the first click.
                             if (v !== null) zoomToDistrict(v);
                         }}
-                        style={{ padding: '0.5rem', fontSize: '1rem', border: '1px solid #bbb', background: '#fff' }}
+                        style={{ padding: '0.5rem', fontSize: '1rem', border: '1px solid var(--app-border-input)', background: 'var(--bg)', color: 'var(--app-ink)' }}
                     >
                         <option value="">— pick a district —</option>
                         {Array.from({ length: COUNT[chamber] }, (_, i) => i + 1).map((n) => {
@@ -379,14 +379,14 @@ export function DistrictMap() {
 
             <aside style={panelStyle} aria-live="polite">
                 {selectedDistrict === null ? (
-                    <p style={{ color: '#666', margin: 0 }}>Click a district or pick one above.</p>
+                    <p style={{ color: 'var(--app-text-muted)', margin: 0 }}>Click a district or pick one above.</p>
                 ) : (
                     <>
-                        <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: '0.8rem', color: '#5a6b80', textTransform: 'uppercase', letterSpacing: '1.5px' }}>
+                        <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: '0.8rem', color: 'var(--app-subtitle)', textTransform: 'uppercase', letterSpacing: '1.5px' }}>
                             {chamber === 'H' ? 'House' : 'Senate'} District {selectedDistrict}
                         </div>
                         {selectedList.length === 0 ? (
-                            <p style={{ marginTop: '0.5rem', color: '#666' }}>
+                            <p style={{ marginTop: '0.5rem', color: 'var(--app-text-muted)' }}>
                                 {sessionId
                                     ? 'Seat vacant for the selected session. No member cast a vote for this district.'
                                     : 'Seat vacant. Active roster has no member assigned to this district.'}
@@ -395,7 +395,7 @@ export function DistrictMap() {
                             <HolderRow leg={selectedList[0]} />
                         ) : (
                             <>
-                                <p style={{ margin: '0.5rem 0 0.75rem', color: '#5a6b80', fontSize: '0.9rem' }}>
+                                <p style={{ margin: '0.5rem 0 0.75rem', color: 'var(--app-subtitle)', fontSize: '0.9rem' }}>
                                     {selectedList.length} members served this district during the selected session:
                                 </p>
                                 <ol style={{ listStyle: 'none', padding: 0, margin: 0 }}>
@@ -404,7 +404,7 @@ export function DistrictMap() {
                                             key={l.people_id}
                                             style={{
                                                 padding: '0.6rem 0',
-                                                borderTop: i === 0 ? 'none' : '1px solid #e8e1cf',
+                                                borderTop: i === 0 ? 'none' : '1px solid var(--app-border-warm)',
                                             }}
                                         >
                                             <HolderRow leg={l} compact />
@@ -421,7 +421,7 @@ export function DistrictMap() {
                         ref={containerRef}
                         role="img"
                         aria-label={`Louisiana ${chamber === 'H' ? 'House' : 'Senate'} district map`}
-                        style={{ width: '100%', height: 680, border: '1px solid #d6d2c4', borderRadius: 4 }}
+                        style={{ width: '100%', height: 680, border: '1px solid var(--app-border-warm)', borderRadius: 4 }}
                     />
                     {mapError && (
                         <div style={mapErrorStyle}>
@@ -466,7 +466,7 @@ function HolderRow({ leg, compact = false }: { leg: Legislator; compact?: boolea
     return (
         <>
             <h3 style={{ margin: titleMargin, fontSize: titleSize }}>
-                <a href={`#/legislator/${leg.people_id}`} style={{ color: '#1a1a1a' }}>
+                <a href={`#/legislator/${leg.people_id}`} style={{ color: 'var(--app-link)' }}>
                     {formatName(leg)}
                 </a>
             </h3>
@@ -474,12 +474,12 @@ function HolderRow({ leg, compact = false }: { leg: Legislator; compact?: boolea
                 {leg.party ?? '—'} · {leg.role === 'Sen' ? 'State Senator' : 'State Representative'}
             </div>
             {term && (
-                <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: '0.75rem', color: '#5a6b80', marginTop: '0.15rem' }}>
+                <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: '0.75rem', color: 'var(--app-subtitle)', marginTop: '0.15rem' }}>
                     Term: {term}
                 </div>
             )}
             {!compact && (
-                <a href={`#/legislator/${leg.people_id}`} style={{ display: 'inline-block', marginTop: '0.75rem', color: '#1e3a5f' }}>
+                <a href={`#/legislator/${leg.people_id}`} style={{ display: 'inline-block', marginTop: '0.75rem', color: 'var(--app-link-navy)' }}>
                     See voting record →
                 </a>
             )}
@@ -489,7 +489,7 @@ function HolderRow({ leg, compact = false }: { leg: Legislator; compact?: boolea
 
 function LegendSwatch({ color, label }: { color: string; label: string }) {
     return (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: '#444' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--app-text-mid)' }}>
             <span
                 aria-hidden="true"
                 style={{
@@ -517,7 +517,7 @@ const controlsStyle: CSSProperties = {
 const legendStyle: CSSProperties = {
     fontFamily: 'ui-monospace, monospace',
     fontSize: '0.75rem',
-    color: '#5a6b80',
+    color: 'var(--app-subtitle)' as string,
     textTransform: 'uppercase',
     letterSpacing: '1.5px',
     padding: '0 0.25rem',
@@ -525,9 +525,9 @@ const legendStyle: CSSProperties = {
 
 const chamberToggleStyle: CSSProperties = {
     display: 'inline-flex',
-    border: '1px solid #1e3a5f',
+    border: '1px solid var(--app-navy-border)' as string,
     borderRadius: 8,
-    background: '#fff',
+    background: 'var(--app-navy-bg)' as string,
     padding: 3,
     gap: 2,
     flex: '0 0 auto',
@@ -540,8 +540,8 @@ function chamberToggleBtnStyle(active: boolean): CSSProperties {
         padding: '0.55rem 1.1rem',
         fontSize: '1rem',
         fontWeight: active ? 700 : 500,
-        background: active ? '#1e3a5f' : 'transparent',
-        color: active ? '#fff' : '#1e3a5f',
+        background: active ? 'var(--app-navy-active-bg)' : 'transparent',
+        color: active ? 'var(--app-navy-active-text)' : 'var(--app-navy-inactive-text)',
         cursor: active ? 'default' : 'pointer',
         borderRadius: 6,
         transition: 'background 120ms ease, color 120ms ease',
@@ -556,8 +556,8 @@ function chamberCountStyle(active: boolean): CSSProperties {
     return {
         fontFamily: 'ui-monospace, monospace',
         fontSize: '0.7rem',
-        background: active ? 'rgba(255,255,255,0.18)' : 'rgba(30,58,95,0.10)',
-        color: active ? '#fff' : '#1e3a5f',
+        background: active ? 'var(--app-navy-count-active-bg)' : 'var(--app-navy-count-bg)',
+        color: active ? 'var(--app-navy-active-text)' : 'var(--app-navy-count-text)',
         padding: '1px 6px',
         borderRadius: 4,
         fontWeight: 600,
@@ -574,8 +574,8 @@ const legendStripStyle: CSSProperties = {
 };
 
 const panelStyle: CSSProperties = {
-    border: '1px solid #d6d2c4',
-    background: '#fffdf7',
+    border: '1px solid var(--app-border-warm)' as string,
+    background: 'var(--app-surface-warm)' as string,
     padding: '1rem 1.25rem',
     borderRadius: 4,
     marginBottom: '0.75rem',
@@ -587,8 +587,8 @@ const mapErrorStyle: CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'rgba(245, 243, 238, 0.95)',
-    color: '#5a6b80',
+    background: 'color-mix(in srgb, var(--app-surface-warm) 95%, transparent)' as string,
+    color: 'var(--app-subtitle)' as string,
     fontFamily: 'ui-monospace, monospace',
     fontSize: '0.85rem',
     padding: '2rem',

@@ -29,7 +29,7 @@ export function RollCallDetail({ id }: { id: number }) {
             .then((d) => { setHead(d.roll_call); setMembers(d.members); });
     }, [id]);
 
-    if (!head) return <p style={{ color: '#666' }}>Loading roll call…</p>;
+    if (!head) return <p style={{ color: 'var(--app-text-muted)' }}>Loading roll call…</p>;
     const byVote: Record<number, RollCallMember[]> = { 1: [], 2: [], 3: [], 4: [] };
     for (const m of members) byVote[m.vote].push(m);
 
@@ -39,7 +39,7 @@ export function RollCallDetail({ id }: { id: number }) {
                 <a
                     href="#"
                     onClick={(e) => { e.preventDefault(); history.back(); }}
-                    style={{ color: '#666' }}
+                    style={{ color: 'var(--app-text-muted)' }}
                 >
                     ← back
                 </a>
@@ -47,15 +47,15 @@ export function RollCallDetail({ id }: { id: number }) {
             <h2 style={{ marginBottom: 0, fontSize: '1.4rem' }}>
                 {head.bill_number}: {head.description}
             </h2>
-            <p style={{ color: '#444', marginTop: '0.2rem' }}>
+            <p style={{ color: 'var(--app-text-mid)', marginTop: '0.2rem' }}>
                 {head.chamber === 'H' ? 'House' : 'Senate'} · {head.date} · category {head.vote_category}
             </p>
             {head.title && (
-                <p style={{ color: '#444', fontStyle: 'italic', borderLeft: '3px solid #ddd', padding: '0.25rem 0 0.25rem 0.75rem' }}>
+                <p style={{ color: 'var(--app-text-mid)', fontStyle: 'italic', borderLeft: '3px solid var(--app-border-light)', padding: '0.25rem 0 0.25rem 0.75rem' }}>
                     {head.title}
                 </p>
             )}
-            <p style={{ color: head.passed ? '#1d6b3a' : '#a32a2a', fontWeight: 700, fontFamily: 'ui-monospace, monospace' }}>
+            <p style={{ color: head.passed ? 'var(--app-pass)' : 'var(--app-fail)', fontWeight: 700, fontFamily: 'ui-monospace, monospace' }}>
                 {head.passed ? 'PASSED' : 'FAILED'}
                 {'  '}Yea {head.yea} · Nay {head.nay} · NV {head.nv} · Absent {head.absent} · margin {head.margin}
             </p>
@@ -64,7 +64,7 @@ export function RollCallDetail({ id }: { id: number }) {
                     href={`https://legis.la.gov/legis/BillInfo.aspx?s=${head.session_name}&b=${encodeURIComponent(head.bill_number)}`}
                     target="_blank"
                     rel="noreferrer"
-                    style={{ color: '#1f5fa6' }}
+                    style={{ color: 'var(--app-link-ext)' }}
                 >
                     {head.bill_number} on legis.la.gov ↗
                 </a>
@@ -75,7 +75,7 @@ export function RollCallDetail({ id }: { id: number }) {
                             href={`https://legis.la.gov/legis/ViewDocument.aspx?d=${head.pdf_doc_id}`}
                             target="_blank"
                             rel="noreferrer"
-                            style={{ color: '#1f5fa6' }}
+                            style={{ color: 'var(--app-link-ext)' }}
                         >
                             roll-call PDF ↗
                         </a>
@@ -86,17 +86,17 @@ export function RollCallDetail({ id }: { id: number }) {
             <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginTop: '1.5rem' }}>
                 {[1, 2, 3, 4].map((v) => (
                     <div key={v}>
-                        <h3 style={{ margin: 0, borderBottom: '2px solid #1a1a1a', paddingBottom: '0.3rem', fontSize: '0.9rem', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                        <h3 style={{ margin: 0, borderBottom: '2px solid var(--app-ink)', paddingBottom: '0.3rem', fontSize: '0.9rem', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
                             {VOTE_LABEL[v]} · {byVote[v].length}
                         </h3>
                         <ul style={{ listStyle: 'none', padding: 0, margin: '0.5rem 0 0', fontFamily: 'ui-monospace, monospace', fontSize: '0.85rem' }}>
                             {byVote[v].map((m) => (
-                                <li key={m.people_id} style={{ padding: '0.15rem 0', borderBottom: '1px solid #f0f0f0' }}>
-                                    <a href={`#/legislator/${m.people_id}`} style={{ color: '#1a1a1a' }}>
+                                <li key={m.people_id} style={{ padding: '0.15rem 0', borderBottom: '1px solid var(--app-border-divider)' }}>
+                                    <a href={`#/legislator/${m.people_id}`} style={{ color: 'var(--app-link)' }}>
                                         {formatName(m)}
                                     </a>
                                     <span style={{ color: partyColor(m.party), marginLeft: '0.4rem', fontWeight: 600 }}>{m.party ?? ''}</span>
-                                    {m.district && <span style={{ color: '#888' }}> · D{m.district}</span>}
+                                    {m.district && <span style={{ color: 'var(--app-text-subtle)' }}> · D{m.district}</span>}
                                     <ProvenanceBadge source={m.source} />
                                 </li>
                             ))}

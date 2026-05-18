@@ -35,16 +35,16 @@ function App() {
                     margin: '0 auto',
                     padding: '2rem 1rem 4rem',
                     fontFamily: 'Georgia, "Times New Roman", serif',
-                    color: '#1a1a1a',
+                    color: 'var(--app-ink)',
                 }}
             >
-                <header style={{ borderBottom: '2px solid #1a1a1a', paddingBottom: '0.5rem', marginBottom: '0.75rem' }}>
+                <header style={{ borderBottom: '2px solid var(--app-ink)', paddingBottom: '0.5rem', marginBottom: '0.75rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '1rem', flexWrap: 'wrap' }}>
                         <a href="#/" style={{ color: 'inherit', textDecoration: 'none', textAlign: 'left' }}>
                             <h1 style={{ margin: 0, fontSize: '2.25rem', letterSpacing: '-0.02em', lineHeight: 1 }}>
                                 Roll Call LA
                             </h1>
-                            <p style={{ margin: '0.2rem 0 0', fontSize: '0.9rem', color: '#5a6b80', fontStyle: 'italic', letterSpacing: '0.01em' }}>
+                            <p style={{ margin: '0.2rem 0 0', fontSize: '0.9rem', color: 'var(--app-subtitle)', fontStyle: 'italic', letterSpacing: '0.01em' }}>
                                 Louisiana Legislator Vote Tracker
                             </p>
                         </a>
@@ -68,9 +68,9 @@ function App() {
 
 function navLinkStyle(active: boolean): CSSProperties {
     return {
-        color: active ? '#1a1a1a' : '#5a6b80',
+        color: active ? 'var(--app-ink)' : 'var(--app-subtitle)',
         textDecoration: 'none',
-        borderBottom: active ? '2px solid #1a1a1a' : '2px solid transparent',
+        borderBottom: active ? '2px solid var(--app-ink)' : '2px solid transparent',
         paddingBottom: '0.15rem',
         fontWeight: active ? 600 : 500,
     };

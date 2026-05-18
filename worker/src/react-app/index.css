@@ -11,6 +11,48 @@
   --shadow:
     rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
 
+  /* App semantic tokens — light values match hardcoded hex exactly */
+  --app-ink: #1a1a1a;
+  --app-text-mid: #444444;
+  --app-text-muted: #666666;
+  --app-text-subtle: #888888;
+  --app-subtitle: #5a6b80;
+  --app-link: #1a1a1a;
+  --app-link-ext: #1f5fa6;
+  --app-link-navy: #1e3a5f;
+  --app-surface: #fafaf6;
+  --app-surface-warm: #fffdf7;
+  --app-border-light: #dddddd;
+  --app-border-row: #eeeeee;
+  --app-border-input: #bbbbbb;
+  --app-border-divider: #f0f0f0;
+  --app-border-warm: #d6d2c4;
+  --app-pass: #1d6b3a;
+  --app-fail: #a32a2a;
+  --app-warn-bg: #fdf3e0;
+  --app-warn-border: #e8c98a;
+  --app-warn-text: #5a3500;
+  --app-warn-text-badge: #8a4a00;
+  --app-badge-bg: #f0f0f0;
+  --app-badge-border: #dddddd;
+  --app-badge-text: #555555;
+  --app-navy-bg: #ffffff;
+  --app-navy-border: #1e3a5f;
+  --app-navy-active-bg: #1e3a5f;
+  --app-navy-active-text: #ffffff;
+  --app-navy-inactive-text: #1e3a5f;
+  --app-navy-count-bg: rgba(30, 58, 95, 0.10);
+  --app-navy-count-text: #1e3a5f;
+  --app-navy-count-active-bg: rgba(255, 255, 255, 0.18);
+  --party-d: #1f5fa6;
+  --party-r: #a32a2a;
+  --party-i: #5a5a5a;
+  --party-none: #9a9a9a;
+  --vote-yea: #1d6b3a;
+  --vote-nay: #a32a2a;
+  --vote-nv: #7a6a3a;
+  --vote-absent: #5a5a5a;
+
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
@@ -43,6 +85,47 @@
     --social-bg: rgba(47, 48, 58, 0.5);
     --shadow:
       rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+
+    --app-ink: #f5f5f5;
+    --app-text-mid: #d1d5db;
+    --app-text-muted: #b0b7c3;
+    --app-text-subtle: #909ba8;
+    --app-subtitle: #a3b0c0;
+    --app-link: #f5f5f5;
+    --app-link-ext: #93c5fd;
+    --app-link-navy: #93c5fd;
+    --app-surface: #1f2028;
+    --app-surface-warm: #1f2028;
+    --app-border-light: #2e303a;
+    --app-border-row: #252630;
+    --app-border-input: #3a3c47;
+    --app-border-divider: #252630;
+    --app-border-warm: #3a3c47;
+    --app-pass: #4ade80;
+    --app-fail: #f87171;
+    --app-warn-bg: #2d1a06;
+    --app-warn-border: #6b4a18;
+    --app-warn-text: #fde8b3;
+    --app-warn-text-badge: #fbbf24;
+    --app-badge-bg: #2a2b35;
+    --app-badge-border: #3a3c47;
+    --app-badge-text: #b0b7c3;
+    --app-navy-bg: #1f2028;
+    --app-navy-border: #4a7ab5;
+    --app-navy-active-bg: #1e3a5f;
+    --app-navy-active-text: #e8f0ff;
+    --app-navy-inactive-text: #93c5fd;
+    --app-navy-count-bg: rgba(147, 197, 253, 0.12);
+    --app-navy-count-text: #93c5fd;
+    --app-navy-count-active-bg: rgba(255, 255, 255, 0.20);
+    --party-d: #60a5fa;
+    --party-r: #f87171;
+    --party-i: #b0b7c3;
+    --party-none: #909ba8;
+    --vote-yea: #4ade80;
+    --vote-nay: #f87171;
+    --vote-nv: #d4a853;
+    --vote-absent: #b0b7c3;
   }
 
   #social .button-icon {

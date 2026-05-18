@@ -45,34 +45,34 @@ export function LegislatorDetail({ id }: { id: number }) {
             .finally(() => setLoading(false));
     }, [id, sessionId, category, vote, closeOnly, q]);
 
-    if (!profile) return <p style={{ color: '#666' }}>Loading legislator…</p>;
+    if (!profile) return <p style={{ color: 'var(--app-text-muted)' }}>Loading legislator…</p>;
     const { legislator: l, final_passage_tally: t, party_line } = profile;
     const fp_total = t.yea + t.nay + t.nv + t.absent;
 
     return (
         <>
             <p style={{ marginTop: 0 }}>
-                <a href="#/" style={{ color: '#666' }}>← all legislators</a>
+                <a href="#/" style={{ color: 'var(--app-text-muted)' }}>← all legislators</a>
             </p>
             <h2 style={{ marginBottom: 0, fontSize: '1.6rem' }}>
                 {formatName(l)}
                 <ProvenanceBadge source={l.source} term_source={l.term_source} style={{ fontSize: '0.65rem' }} />
             </h2>
-            <p style={{ color: '#444', marginTop: '0.2rem' }}>
+            <p style={{ color: 'var(--app-text-mid)', marginTop: '0.2rem' }}>
                 <span style={{ color: partyColor(l.party), fontWeight: 600 }}>{partyName(l.party)}</span>
                 {' · '}{l.role === 'Sen' ? 'Senator' : 'Representative'}
                 {l.district ? ` · District ${l.district}` : ''}
                 {l.active === 0 ? ' · not currently serving' : ''}
             </p>
             {(l.term_start || l.term_end || l.year_elected) && (
-                <p style={{ color: '#666', fontSize: '0.85rem', fontFamily: 'ui-monospace, monospace', marginTop: '0.2rem' }}>
+                <p style={{ color: 'var(--app-text-muted)', fontSize: '0.85rem', fontFamily: 'ui-monospace, monospace', marginTop: '0.2rem' }}>
                     {l.year_elected ? `Year elected ${l.year_elected}` : null}
                     {l.term_start ? ` · Term start ${l.term_start}` : null}
                     {l.term_end ? ` · Term end ${l.term_end}` : null}
                 </p>
             )}
             {l.source === 'pdf' && (
-                <p style={{ background: '#fdf3e0', border: '1px solid #e8c98a', padding: '0.5rem 0.75rem', fontSize: '0.85rem', color: '#5a3500', marginTop: '0.75rem' }}>
+                <p style={{ background: 'var(--app-warn-bg)', border: '1px solid var(--app-warn-border)', padding: '0.5rem 0.75rem', fontSize: '0.85rem', color: 'var(--app-warn-text)', marginTop: '0.75rem' }}>
                     Limited information. This legislator's votes appear in roll-call PDFs but we couldn't match them to a current chamber roster — most likely because they left office. First name, party, and district aren't available until backfilled from an external source.
                 </p>
             )}
@@ -87,7 +87,7 @@ export function LegislatorDetail({ id }: { id: number }) {
             </section>
 
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', marginTop: '1rem' }}>
-                <select value={category} onChange={(e) => setCategory(e.target.value)} style={{ padding: '0.5rem' }}>
+                <select value={category} onChange={(e) => setCategory(e.target.value)} style={{ padding: '0.5rem', background: 'var(--app-surface)', border: '1px solid var(--app-border-input)', color: 'var(--app-ink)' }}>
                     <option value="final_passage">Final passage only</option>
                     <option value="concurrence">Concurrence</option>
                     <option value="override">Veto override</option>
@@ -95,7 +95,7 @@ export function LegislatorDetail({ id }: { id: number }) {
                     <option value="procedural">Procedural</option>
                     <option value="">All categories</option>
                 </select>
-                <select value={vote} onChange={(e) => setVote(e.target.value)} style={{ padding: '0.5rem' }}>
+                <select value={vote} onChange={(e) => setVote(e.target.value)} style={{ padding: '0.5rem', background: 'var(--app-surface)', border: '1px solid var(--app-border-input)', color: 'var(--app-ink)' }}>
                     <option value="">Any vote cast</option>
                     <option value="1">Only Yea</option>
                     <option value="2">Only Nay</option>
@@ -111,18 +111,19 @@ export function LegislatorDetail({ id }: { id: number }) {
                     placeholder="Bill # or title…"
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
-                    style={{ flex: '1 1 200px', padding: '0.5rem', border: '1px solid #bbb' }}
+                    style={{ flex: '1 1 200px', padding: '0.5rem', border: '1px solid var(--app-border-input)', background: 'var(--bg)', color: 'var(--app-ink)' }}
                 />
             </div>
 
-            <p style={{ color: '#666', marginTop: '1rem', fontSize: '0.9rem' }}>
+            <p style={{ color: 'var(--app-text-muted)', marginTop: '1rem', fontSize: '0.9rem' }}>
                 {loading ? 'Loading…' : `${votes.length} vote${votes.length === 1 ? '' : 's'}`}
                 {votes.length === 100 ? ' (showing 100 most recent — refine filters to see more)' : ''}
             </p>
 
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'ui-monospace, monospace', fontSize: '0.85rem' }}>
+            <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table style={{ width: '100%', minWidth: 560, borderCollapse: 'collapse', fontFamily: 'ui-monospace, monospace', fontSize: '0.85rem' }}>
                 <thead>
-                    <tr style={{ borderBottom: '2px solid #1a1a1a', textAlign: 'left' }}>
+                    <tr style={{ borderBottom: '2px solid var(--app-ink)', textAlign: 'left' }}>
                         <th style={{ padding: '0.5rem 0.25rem' }}>Date</th>
                         <th style={{ padding: '0.5rem 0.25rem' }}>Bill</th>
                         <th style={{ padding: '0.5rem 0.25rem' }}>Description</th>
@@ -133,7 +134,7 @@ export function LegislatorDetail({ id }: { id: number }) {
                 </thead>
                 <tbody>
                     {votes.map((v) => (
-                        <tr key={v.roll_call_id} style={{ borderBottom: '1px solid #eee' }}>
+                        <tr key={v.roll_call_id} style={{ borderBottom: '1px solid var(--app-border-row)' }}>
                             <td style={{ padding: '0.4rem 0.25rem', whiteSpace: 'nowrap' }}>{v.date}</td>
                             <td style={{ padding: '0.4rem 0.25rem' }}>
                                 {current ? (
@@ -141,31 +142,32 @@ export function LegislatorDetail({ id }: { id: number }) {
                                         href={`https://legis.la.gov/legis/BillInfo.aspx?s=${current.name}&b=${encodeURIComponent(v.bill_number)}`}
                                         target="_blank"
                                         rel="noreferrer"
-                                        style={{ color: '#1f5fa6' }}
+                                        style={{ color: 'var(--app-link-ext)' }}
                                     >
                                         {v.bill_number}
                                     </a>
                                 ) : v.bill_number}
                             </td>
                             <td style={{ padding: '0.4rem 0.25rem' }}>
-                                <a href={`#/rollcall/${v.roll_call_id}`} style={{ color: '#1a1a1a' }}>
+                                <a href={`#/rollcall/${v.roll_call_id}`} style={{ color: 'var(--app-link)' }}>
                                     {v.description}
                                 </a>
                                 {v.title ? (
-                                    <span style={{ color: '#777', display: 'block', fontSize: '0.8rem', maxWidth: 480, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    <span style={{ color: 'var(--app-text-subtle)', display: 'block', fontSize: '0.8rem', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                         {v.title}
                                     </span>
                                 ) : null}
                             </td>
                             <td style={{ padding: '0.4rem 0.25rem', color: voteColor(v.cast_vote), fontWeight: 700 }}>{VOTE_LABEL[v.cast_vote]}</td>
-                            <td style={{ padding: '0.4rem 0.25rem', whiteSpace: 'nowrap', color: '#444' }}>
+                            <td style={{ padding: '0.4rem 0.25rem', whiteSpace: 'nowrap', color: 'var(--app-text-mid)' }}>
                                 {v.yea}–{v.nay}
                             </td>
-                            <td style={{ padding: '0.4rem 0.25rem', color: v.passed ? '#1d6b3a' : '#a32a2a' }}>{v.passed ? 'Passed' : 'Failed'}</td>
+                            <td style={{ padding: '0.4rem 0.25rem', color: v.passed ? 'var(--app-pass)' : 'var(--app-fail)' }}>{v.passed ? 'Passed' : 'Failed'}</td>
                         </tr>
                     ))}
                 </tbody>
             </table>
+            </div>
         </>
     );
 }
@@ -179,8 +181,8 @@ function partyName(p: string | null) {
 
 function Stat({ label, value }: { label: string; value: number | string }) {
     return (
-        <div style={{ border: '1px solid #ddd', padding: '0.6rem 0.75rem', background: '#fafaf6' }}>
-            <div style={{ fontSize: '0.7rem', color: '#666', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{label}</div>
+        <div style={{ border: '1px solid var(--app-border-light)', padding: '0.6rem 0.75rem', background: 'var(--app-surface)' }}>
+            <div style={{ fontSize: '0.7rem', color: 'var(--app-text-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{label}</div>
             <div style={{ fontSize: '1.4rem', fontFamily: 'ui-monospace, monospace' }}>{value}</div>
         </div>
     );

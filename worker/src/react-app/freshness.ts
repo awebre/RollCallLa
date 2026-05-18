@@ -7,9 +7,9 @@ export const FRESH_HOURS = 12;
 export const STALE_HOURS = 24;
 
 export function freshnessColor(hoursAgo: number): string {
-    if (hoursAgo < FRESH_HOURS) return '#1d6b3a';   // green — fresh
-    if (hoursAgo < STALE_HOURS) return '#7a6a3a';   // amber — getting old
-    return '#a32a2a';                                // red — stale
+    if (hoursAgo < FRESH_HOURS) return 'var(--vote-yea)';
+    if (hoursAgo < STALE_HOURS) return 'var(--vote-nv)';
+    return 'var(--vote-nay)';
 }
 
 export function relativeTime(iso: string, now: number = Date.now()): { label: string; hoursAgo: number } {
