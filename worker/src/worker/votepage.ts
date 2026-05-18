@@ -10,7 +10,7 @@
 //                   classifier (categorize.ts) to pick the indexed enum
 //   rc_number     - chamber-scoped roll-call sequence number
 
-import { categorize, type VoteCategory } from './categorize';
+import { categorize, type VoteCategory } from './categorize.ts';
 
 export type VotePageRow = {
     doc_id: number;
