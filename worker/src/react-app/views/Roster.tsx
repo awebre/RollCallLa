@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import type { Legislator } from '../types';
 import { formatName, partyColor } from '../types';
+import { useSession } from '../SessionContext';
 
 export function Roster() {
+    const { current } = useSession();
+    const sessionId = current?.session_id ?? null;
     const [legislators, setLegislators] = useState<Legislator[]>([]);
     const [loading, setLoading] = useState(true);
     const [chamber, setChamber] = useState<'' | 'H' | 'S'>('');
@@ -11,16 +14,17 @@ export function Roster() {
 
     useEffect(() => {
         const params = new URLSearchParams();
+        if (sessionId) params.set('session_id', String(sessionId));
         if (chamber) params.set('chamber', chamber);
         if (party) params.set('party', party);
         if (q) params.set('q', q);
-        params.set('active', '1');
+        if (!sessionId) params.set('active', '1');
         setLoading(true);
         fetch(`/api/legislators?${params.toString()}`)
             .then((r) => r.json() as Promise<{ legislators: Legislator[] }>)
             .then((d) => setLegislators(d.legislators))
             .finally(() => setLoading(false));
-    }, [chamber, party, q]);
+    }, [sessionId, chamber, party, q]);
 
     return (
         <>

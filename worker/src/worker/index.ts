@@ -60,32 +60,51 @@ app.get('/api/status', async (c) => {
 });
 
 app.get('/api/legislators', async (c) => {
-    const { chamber, party, q, active } = c.req.query();
+    const { chamber, party, q, active, session_id } = c.req.query();
+    const sessionId = Number(session_id) || null;
+
     const where: string[] = [];
     const binds: (string | number)[] = [];
     if (chamber === 'H' || chamber === 'S') {
-        where.push('role = ?');
+        where.push('l.role = ?');
         binds.push(chamber === 'S' ? 'Sen' : 'Rep');
     }
     if (party) {
-        where.push('party = ?');
+        where.push('l.party = ?');
         binds.push(party.toUpperCase());
     }
-    if (active === '1' || active === '0') {
-        where.push('active = ?');
+    // The "active" flag only makes sense without a session filter — within a session,
+    // "served then" is the meaningful predicate, derived from votes below.
+    if (!sessionId && (active === '1' || active === '0')) {
+        where.push('l.active = ?');
         binds.push(Number(active));
     }
     if (q) {
-        where.push('(last_name LIKE ? OR first_name LIKE ? OR nickname LIKE ?)');
+        where.push('(l.last_name LIKE ? OR l.first_name LIKE ? OR l.nickname LIKE ?)');
         const like = `%${q}%`;
         binds.push(like, like, like);
     }
+
+    // When scoped to a session, restrict to legislators who actually cast at least one
+    // vote in that session (covers turnover honestly + picks up synthetic rows).
+    const sessionJoin = sessionId
+        ? `INNER JOIN (
+                SELECT DISTINCT v.people_id
+                FROM votes v
+                JOIN roll_calls rc ON rc.roll_call_id = v.roll_call_id
+                JOIN bills b       ON b.bill_id      = rc.bill_id
+                WHERE b.session_id = ?
+           ) sv ON sv.people_id = l.people_id`
+        : '';
+    if (sessionId) binds.unshift(sessionId);
+
     const sql = `
-        SELECT people_id, first_name, middle_name, last_name, suffix, nickname,
-               party, role, district, active
-        FROM legislators
+        SELECT l.people_id, l.first_name, l.middle_name, l.last_name, l.suffix, l.nickname,
+               l.party, l.role, l.district, l.active
+        FROM legislators l
+        ${sessionJoin}
         ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
-        ORDER BY last_name, first_name
+        ORDER BY l.last_name, l.first_name
     `;
     const { results } = await c.env.DB.prepare(sql).bind(...binds).all();
     c.header('cache-control', CACHE);
