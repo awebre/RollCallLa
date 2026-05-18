@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { Legislator } from '../types';
 import { formatName, partyColor } from '../types';
+import { useSession } from '../SessionContext';
 
-// The map always shows current (2024-vintage) district boundaries and joins to
-// currently-serving legislators. Switching the session in the header only
-// affects vote history elsewhere in the app — the boundaries themselves do not
-// change between 2024–2026 (Acts 1 & 5 of 2022 remain in force; Nairne v. Landry
-// is stayed pending Louisiana v. Callais).
+// District boundaries are TIGER 2024 (post-2022 redistricting; Acts 1 & 5 of
+// 2022). They remain in force for the 2024–2026 sessions — Nairne v. Landry is
+// stayed pending Louisiana v. Callais. Seat-holders, by contrast, ARE session-
+// scoped: a session picker change re-keys the polygon-to-legislator join to
+// the people who actually cast votes in that session (covers mid-term
+// resignations, deaths, and special-election succession). Multiple holders per
+// (role, district, session) are surfaced as a list in the side panel; map
+// coloring follows the most recent holder by term_start.
 
 type Chamber = 'H' | 'S';
 const ROLE: Record<Chamber, 'Rep' | 'Sen'> = { H: 'Rep', S: 'Sen' };
@@ -25,6 +29,8 @@ function loadDistricts(chamber: Chamber): Promise<FC> {
 }
 
 export function DistrictMap() {
+    const { current: currentSession } = useSession();
+    const sessionId = currentSession?.session_id ?? null;
     const [chamber, setChamber] = useState<Chamber>('H');
     const [legislators, setLegislators] = useState<Legislator[]>([]);
     const [selectedDistrict, setSelectedDistrict] = useState<number | null>(null);
@@ -47,19 +53,41 @@ export function DistrictMap() {
     const selectedDistrictRef = useRef<number | null>(null);
 
     useEffect(() => {
-        fetch('/api/legislators?active=1')
+        // With a session selected, ask for "everyone who voted in that session"
+        // (covers special-election successors + synthetic PDF-only rows).
+        // Without one, fall back to the currently-serving roster.
+        const url = sessionId
+            ? `/api/legislators?session_id=${sessionId}`
+            : '/api/legislators?active=1';
+        fetch(url)
             .then((r) => r.json() as Promise<{ legislators: Legislator[] }>)
             .then((d) => setLegislators(d.legislators))
             .catch(() => {
                 // Non-fatal — map still works for browsing; the side panel will show "Seat vacant" everywhere.
             });
-    }, []);
+    }, [sessionId]);
 
+    // Index by (role, district). A single district may have multiple holders in
+    // one session (resignations, mid-term deaths, special elections), so the
+    // value is a list rather than a single legislator. Each list is sorted with
+    // the most recent term-start first — that's the row used for the polygon's
+    // party color; the rest show below in the side panel.
     const byKey = useMemo(() => {
-        const m = new Map<string, Legislator>();
+        const m = new Map<string, Legislator[]>();
         for (const l of legislators) {
             if (!l.role || !l.district) continue;
-            m.set(`${l.role}-${l.district}`, l);
+            const k = `${l.role}-${l.district}`;
+            const arr = m.get(k);
+            if (arr) arr.push(l);
+            else m.set(k, [l]);
+        }
+        for (const arr of m.values()) {
+            arr.sort((a, b) => {
+                const at = a.term_start ?? '';
+                const bt = b.term_start ?? '';
+                if (at !== bt) return bt.localeCompare(at);
+                return a.people_id - b.people_id;
+            });
         }
         return m;
     }, [legislators]);
@@ -192,12 +220,15 @@ export function DistrictMap() {
 
             // Stamp vacant + party feature-state up-front so the political shading
             // and gray vacant fill are correct on first paint, before any hover/click.
+            // For districts with multiple holders this session, the most recent
+            // holder (first in the sorted list) drives the polygon color.
             for (const feat of data.features) {
                 const d = feat.properties.district;
-                const leg = byKey.get(`${ROLE[chamber]}-${d}`);
+                const list = byKey.get(`${ROLE[chamber]}-${d}`);
+                const primary = list?.[0];
                 map.setFeatureState(
                     { source: 'districts', id: d },
-                    { vacant: !leg, party: leg?.party ?? null },
+                    { vacant: !primary, party: primary?.party ?? null },
                 );
             }
 
@@ -272,7 +303,9 @@ export function DistrictMap() {
         if (b) map.fitBounds(b, { padding: 60, duration: 600, maxZoom: 11 });
     }
 
-    const selectedLeg = selectedDistrict !== null ? byKey.get(`${ROLE[chamber]}-${selectedDistrict}`) ?? null : null;
+    const selectedList: Legislator[] = selectedDistrict !== null
+        ? byKey.get(`${ROLE[chamber]}-${selectedDistrict}`) ?? []
+        : [];
 
     return (
         <>
@@ -280,7 +313,7 @@ export function DistrictMap() {
                 Browse Louisiana's legislative districts. No address required. We don't ask for or store your location.
             </p>
             <p style={{ color: '#666', fontSize: '0.85rem', margin: '0 0 1rem' }}>
-                Showing current (2024) district boundaries. To see how today's members voted on past bills, switch sessions in the header.
+                District lines are the post-2022 maps (in force for the 2024 sessions onward). Seat-holders reflect who actually served in the session selected above — mid-session successors are listed in the panel.
             </p>
 
             <div role="group" aria-label="District search controls" style={controlsStyle}>
@@ -321,8 +354,12 @@ export function DistrictMap() {
                     >
                         <option value="">— pick a district —</option>
                         {Array.from({ length: COUNT[chamber] }, (_, i) => i + 1).map((n) => {
-                            const l = byKey.get(`${ROLE[chamber]}-${n}`);
-                            const label = l ? `${formatName(l)} (${l.party ?? '—'})` : 'vacant';
+                            const list = byKey.get(`${ROLE[chamber]}-${n}`) ?? [];
+                            const primary = list[0];
+                            const extra = list.length - 1;
+                            const label = primary
+                                ? `${formatName(primary)} (${primary.party ?? '—'})${extra > 0 ? ` + ${extra} other` : ''}`
+                                : 'vacant';
                             return (
                                 <option key={n} value={n}>
                                     District {n} — {label}
@@ -341,35 +378,44 @@ export function DistrictMap() {
             </div>
 
             <aside style={panelStyle} aria-live="polite">
-                    {selectedDistrict === null ? (
-                        <p style={{ color: '#666', margin: 0 }}>Click a district or pick one above.</p>
-                    ) : (
-                        <>
-                            <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: '0.8rem', color: '#5a6b80', textTransform: 'uppercase', letterSpacing: '1.5px' }}>
-                                {chamber === 'H' ? 'House' : 'Senate'} District {selectedDistrict}
-                            </div>
-                            {selectedLeg ? (
-                                <>
-                                    <h3 style={{ margin: '0.5rem 0 0.25rem', fontSize: '1.4rem' }}>
-                                        <a href={`#/legislator/${selectedLeg.people_id}`} style={{ color: '#1a1a1a' }}>
-                                            {formatName(selectedLeg)}
-                                        </a>
-                                    </h3>
-                                    <div style={{ color: partyColor(selectedLeg.party), fontWeight: 600 }}>
-                                        {selectedLeg.party ?? '—'} · {selectedLeg.role === 'Sen' ? 'State Senator' : 'State Representative'}
-                                    </div>
-                                    <a href={`#/legislator/${selectedLeg.people_id}`} style={{ display: 'inline-block', marginTop: '0.75rem', color: '#1e3a5f' }}>
-                                        See voting record →
-                                    </a>
-                                </>
-                            ) : (
-                                <p style={{ marginTop: '0.5rem', color: '#666' }}>
-                                    Seat vacant. Active roster has no member assigned to this district.
+                {selectedDistrict === null ? (
+                    <p style={{ color: '#666', margin: 0 }}>Click a district or pick one above.</p>
+                ) : (
+                    <>
+                        <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: '0.8rem', color: '#5a6b80', textTransform: 'uppercase', letterSpacing: '1.5px' }}>
+                            {chamber === 'H' ? 'House' : 'Senate'} District {selectedDistrict}
+                        </div>
+                        {selectedList.length === 0 ? (
+                            <p style={{ marginTop: '0.5rem', color: '#666' }}>
+                                {sessionId
+                                    ? 'Seat vacant for the selected session. No member cast a vote for this district.'
+                                    : 'Seat vacant. Active roster has no member assigned to this district.'}
+                            </p>
+                        ) : selectedList.length === 1 ? (
+                            <HolderRow leg={selectedList[0]} />
+                        ) : (
+                            <>
+                                <p style={{ margin: '0.5rem 0 0.75rem', color: '#5a6b80', fontSize: '0.9rem' }}>
+                                    {selectedList.length} members served this district during the selected session:
                                 </p>
-                            )}
-                        </>
-                    )}
-                </aside>
+                                <ol style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                                    {selectedList.map((l, i) => (
+                                        <li
+                                            key={l.people_id}
+                                            style={{
+                                                padding: '0.6rem 0',
+                                                borderTop: i === 0 ? 'none' : '1px solid #e8e1cf',
+                                            }}
+                                        >
+                                            <HolderRow leg={l} compact />
+                                        </li>
+                                    ))}
+                                </ol>
+                            </>
+                        )}
+                    </>
+                )}
+            </aside>
                 <div style={{ position: 'relative', minHeight: 680 }}>
                     <div
                         ref={containerRef}
@@ -408,6 +454,37 @@ function bboxOf(geom: unknown): [[number, number], [number, number]] | null {
     visit(g.coordinates);
     if (!isFinite(minLng)) return null;
     return [[minLng, minLat], [maxLng, maxLat]];
+}
+
+function HolderRow({ leg, compact = false }: { leg: Legislator; compact?: boolean }) {
+    const titleSize = compact ? '1.1rem' : '1.4rem';
+    const titleMargin = compact ? '0 0 0.15rem' : '0.5rem 0 0.25rem';
+    const term =
+        leg.term_start || leg.term_end
+            ? `${leg.term_start ?? '—'} → ${leg.term_end ?? 'present'}`
+            : null;
+    return (
+        <>
+            <h3 style={{ margin: titleMargin, fontSize: titleSize }}>
+                <a href={`#/legislator/${leg.people_id}`} style={{ color: '#1a1a1a' }}>
+                    {formatName(leg)}
+                </a>
+            </h3>
+            <div style={{ color: partyColor(leg.party), fontWeight: 600, fontSize: compact ? '0.9rem' : '1rem' }}>
+                {leg.party ?? '—'} · {leg.role === 'Sen' ? 'State Senator' : 'State Representative'}
+            </div>
+            {term && (
+                <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: '0.75rem', color: '#5a6b80', marginTop: '0.15rem' }}>
+                    Term: {term}
+                </div>
+            )}
+            {!compact && (
+                <a href={`#/legislator/${leg.people_id}`} style={{ display: 'inline-block', marginTop: '0.75rem', color: '#1e3a5f' }}>
+                    See voting record →
+                </a>
+            )}
+        </>
+    );
 }
 
 function LegendSwatch({ color, label }: { color: string; label: string }) {
