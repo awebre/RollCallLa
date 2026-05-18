@@ -11,8 +11,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFileSync } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { runD1 as runD1Raw } from './lib/d1.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -27,16 +27,7 @@ function escSql(v) {
     return `'${String(v).replace(/'/g, "''")}'`;
 }
 
-function runD1(cmd) {
-    const out = execFileSync('npx', ['wrangler', 'd1', 'execute', 'la_vote_tracker', '--local', '--command', cmd, '--json'], {
-        cwd: ROOT,
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    const jsonStart = out.indexOf('\n[');
-    const json = JSON.parse(out.slice(jsonStart === -1 ? out.indexOf('[') : jsonStart + 1));
-    return json[0]?.results ?? [];
-}
+const runD1 = (cmd) => runD1Raw(cmd, { cwd: ROOT });
 
 async function fetchCached(url, name) {
     const cachePath = join(CACHE_DIR, name);

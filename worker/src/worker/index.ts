@@ -50,7 +50,15 @@ app.get('/api/status', async (c) => {
             db.prepare(`SELECT COUNT(*) AS n FROM votes`),
             db.prepare(`SELECT COUNT(*) AS n FROM legislators WHERE active = 1`),
         ];
-    const [bills, rolls, votes, legs] = await db.batch(queries);
+    const [bills, rolls, votes, legs, ingest] = await db.batch([
+        ...queries,
+        db.prepare(
+            `SELECT finished_at, trigger FROM ingest_runs
+             WHERE status = 'success'
+             ORDER BY id DESC LIMIT 1`,
+        ),
+    ]);
+    const last = ingest.results[0] as { finished_at: string; trigger: string } | undefined;
     c.header('cache-control', CACHE);
     return c.json({
         counts: {
@@ -60,7 +68,8 @@ app.get('/api/status', async (c) => {
             active_legislators: (legs.results[0] as { n: number }).n,
         },
         scoped_to_session: sessionId,
-        last_refresh: null,
+        last_refresh: last?.finished_at ?? null,
+        last_refresh_trigger: last?.trigger ?? null,
     });
 });
 
