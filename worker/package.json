@@ -17,10 +17,12 @@
     "db:reset:local": "rm -rf .wrangler/state/v3/d1 && npm run db:migrate:local",
     "scrape:rosters": "node scripts/scrape-rosters.mjs /tmp/rosters.sql && wrangler d1 execute DB --local --file /tmp/rosters.sql",
     "scrape:bills": "node --experimental-strip-types scripts/scrape-bills.mjs",
+    "parse:rollcalls": "node --experimental-strip-types scripts/parse-rollcalls.mjs",
     "test": "vitest run"
   },
   "dependencies": {
     "hono": "^4.12.19",
+    "pdf-parse": "^2.4.5",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },

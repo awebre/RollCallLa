@@ -218,9 +218,9 @@ for (let ti = 0; ti < types.length; ti++) {
             const rcid = rollCallId(r.chamber, r.rc_number);
             // Dates / tallies / passed flag come from PDF parsing in the next pass; default to placeholders.
             sqlChunks.push(
-                `INSERT INTO roll_calls (roll_call_id, bill_id, date, chamber, description, vote_category) VALUES (${rcid}, ${bid}, '1970-01-01', ${escSql(
+                `INSERT INTO roll_calls (roll_call_id, bill_id, date, chamber, description, vote_category, pdf_doc_id) VALUES (${rcid}, ${bid}, '1970-01-01', ${escSql(
                     r.chamber,
-                )}, ${escSql(r.description)}, ${escSql(r.category)}) ON CONFLICT(roll_call_id) DO UPDATE SET bill_id=excluded.bill_id, chamber=excluded.chamber, description=excluded.description, vote_category=excluded.vote_category;`,
+                )}, ${escSql(r.description)}, ${escSql(r.category)}, ${r.doc_id}) ON CONFLICT(roll_call_id) DO UPDATE SET bill_id=excluded.bill_id, chamber=excluded.chamber, description=excluded.description, vote_category=excluded.vote_category, pdf_doc_id=excluded.pdf_doc_id;`,
             );
         }
     }
