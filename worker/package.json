@@ -18,6 +18,7 @@
     "db:migrate:remote": "wrangler d1 migrations apply la_vote_tracker --remote",
     "db:console:local": "wrangler d1 execute la_vote_tracker --local --command",
     "db:reset:local": "rm -rf .wrangler/state/v3/d1 && npm run db:migrate:local",
+    "build:districts": "node scripts/build-districts.mjs",
     "scrape:rosters": "node scripts/scrape-rosters.mjs /tmp/rosters.sql && wrangler d1 execute la_vote_tracker --local --file /tmp/rosters.sql",
     "scrape:bills": "node --experimental-strip-types scripts/scrape-bills.mjs",
     "scrape:terms": "node scripts/scrape-term-dates.mjs && wrangler d1 execute la_vote_tracker --local --file /tmp/term_dates.sql",
@@ -26,6 +27,7 @@
   },
   "dependencies": {
     "hono": "^4.12.19",
+    "maplibre-gl": "^5.24.0",
     "pdf-parse": "^2.4.5",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
@@ -41,6 +43,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
+    "mapshaper": "^0.6.121",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
     "vite": "^8.0.12",
