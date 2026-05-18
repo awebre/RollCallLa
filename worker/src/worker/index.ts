@@ -100,7 +100,8 @@ app.get('/api/legislators', async (c) => {
 
     const sql = `
         SELECT l.people_id, l.first_name, l.middle_name, l.last_name, l.suffix, l.nickname,
-               l.party, l.role, l.district, l.active
+               l.party, l.role, l.district, l.active, l.source, l.term_source,
+               l.term_start, l.term_end
         FROM legislators l
         ${sessionJoin}
         ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
@@ -124,7 +125,8 @@ app.get('/api/legislators/:id', async (c) => {
     const [profile, tally, partyLine] = await c.env.DB.batch([
         c.env.DB.prepare(
             `SELECT people_id, first_name, middle_name, last_name, suffix, nickname,
-                    party, role, district, active
+                    party, role, district, active, source, term_source,
+                    term_start, term_end, year_elected
              FROM legislators WHERE people_id = ?`,
         ).bind(id),
         c.env.DB.prepare(
@@ -266,7 +268,7 @@ app.get('/api/rollcalls/:id', async (c) => {
         ).bind(id),
         c.env.DB.prepare(
             `SELECT v.vote, l.people_id, l.first_name, l.last_name, l.suffix, l.nickname,
-                    l.party, l.role, l.district
+                    l.party, l.role, l.district, l.source
              FROM votes v JOIN legislators l ON l.people_id = v.people_id
              WHERE v.roll_call_id = ?
              ORDER BY l.last_name, l.first_name`,

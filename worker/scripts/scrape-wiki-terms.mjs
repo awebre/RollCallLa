@@ -165,7 +165,7 @@ for (const l of candidates) {
         const synth = syntheticByKey.get(`${l.role}|${predLast}`);
         if (synth) {
             predecessorHits++;
-            sql.push(`UPDATE legislators SET term_end=${escSql(dayBefore(found.assumed))} WHERE people_id=${synth};`);
+            sql.push(`UPDATE legislators SET term_end=${escSql(dayBefore(found.assumed))}, term_source='derived' WHERE people_id=${synth};`);
         }
     }
 }

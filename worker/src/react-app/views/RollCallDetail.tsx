@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { RollCallMember } from '../types';
 import { formatName, partyColor, VOTE_LABEL } from '../types';
+import { ProvenanceBadge } from '../components/ProvenanceBadge';
 
 type RollCallHead = {
     roll_call_id: number;
@@ -96,6 +97,7 @@ export function RollCallDetail({ id }: { id: number }) {
                                     </a>
                                     <span style={{ color: partyColor(m.party), marginLeft: '0.4rem', fontWeight: 600 }}>{m.party ?? ''}</span>
                                     {m.district && <span style={{ color: '#888' }}> · D{m.district}</span>}
+                                    <ProvenanceBadge source={m.source} />
                                 </li>
                             ))}
                         </ul>

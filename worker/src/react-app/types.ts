@@ -9,6 +9,11 @@ export type Legislator = {
     role: string | null;
     district: string | null;
     active: number;
+    source?: 'roster' | 'pdf' | null;
+    term_source?: 'official' | 'wikipedia' | 'derived' | null;
+    term_start?: string | null;
+    term_end?: string | null;
+    year_elected?: number | null;
 };
 
 export type LegislatorVoteRow = {
@@ -36,6 +41,7 @@ export type RollCallMember = {
     party: string | null;
     role: string | null;
     district: string | null;
+    source?: 'roster' | 'pdf' | null;
 };
 
 export function formatName(l: { first_name: string; last_name: string; suffix: string | null; nickname?: string | null }) {

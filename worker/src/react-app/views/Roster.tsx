@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Legislator } from '../types';
 import { formatName, partyColor } from '../types';
 import { useSession } from '../SessionContext';
+import { ProvenanceBadge } from '../components/ProvenanceBadge';
 
 export function Roster() {
     const { current } = useSession();
@@ -73,6 +74,7 @@ export function Roster() {
                                 <a href={`#/legislator/${l.people_id}`} style={{ color: '#1a1a1a' }}>
                                     {formatName(l)}
                                 </a>
+                                <ProvenanceBadge source={l.source} term_source={l.term_source} />
                             </td>
                             <td style={{ padding: '0.4rem 0.25rem', color: partyColor(l.party), fontWeight: 600 }}>{l.party ?? '—'}</td>
                             <td style={{ padding: '0.4rem 0.25rem' }}>{l.role ?? '—'}</td>

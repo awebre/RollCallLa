@@ -134,7 +134,7 @@ function buildUpserts(rows) {
     const lines = [];
     for (const r of rows) {
         lines.push(
-            'INSERT INTO legislators (people_id, first_name, middle_name, last_name, suffix, nickname, party, role, district, active) VALUES (' +
+            'INSERT INTO legislators (people_id, first_name, middle_name, last_name, suffix, nickname, party, role, district, active, source) VALUES (' +
             [
                 r.people_id,
                 escSql(r.first_name),
@@ -146,11 +146,12 @@ function buildUpserts(rows) {
                 escSql(r.role),
                 escSql(r.district),
                 1,
+                escSql('roster'),
             ].join(', ') +
             ') ON CONFLICT(people_id) DO UPDATE SET ' +
             'first_name=excluded.first_name, middle_name=excluded.middle_name, last_name=excluded.last_name, ' +
             'suffix=excluded.suffix, nickname=excluded.nickname, party=excluded.party, ' +
-            'role=excluded.role, district=excluded.district, active=1;'
+            'role=excluded.role, district=excluded.district, active=1, source=excluded.source;'
         );
     }
     return lines.join('\n');

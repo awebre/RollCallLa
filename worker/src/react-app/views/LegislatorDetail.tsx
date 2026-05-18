@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Legislator, LegislatorVoteRow } from '../types';
 import { formatName, partyColor, voteColor, VOTE_LABEL } from '../types';
 import { useSession } from '../SessionContext';
+import { ProvenanceBadge } from '../components/ProvenanceBadge';
 
 type Profile = {
     legislator: Legislator;
@@ -53,13 +54,28 @@ export function LegislatorDetail({ id }: { id: number }) {
             <p style={{ marginTop: 0 }}>
                 <a href="#/" style={{ color: '#666' }}>← all legislators</a>
             </p>
-            <h2 style={{ marginBottom: 0, fontSize: '1.6rem' }}>{formatName(l)}</h2>
+            <h2 style={{ marginBottom: 0, fontSize: '1.6rem' }}>
+                {formatName(l)}
+                <ProvenanceBadge source={l.source} term_source={l.term_source} style={{ fontSize: '0.65rem' }} />
+            </h2>
             <p style={{ color: '#444', marginTop: '0.2rem' }}>
                 <span style={{ color: partyColor(l.party), fontWeight: 600 }}>{partyName(l.party)}</span>
                 {' · '}{l.role === 'Sen' ? 'Senator' : 'Representative'}
                 {l.district ? ` · District ${l.district}` : ''}
                 {l.active === 0 ? ' · not currently serving' : ''}
             </p>
+            {(l.term_start || l.term_end || l.year_elected) && (
+                <p style={{ color: '#666', fontSize: '0.85rem', fontFamily: 'ui-monospace, monospace', marginTop: '0.2rem' }}>
+                    {l.year_elected ? `Year elected ${l.year_elected}` : null}
+                    {l.term_start ? ` · Term start ${l.term_start}` : null}
+                    {l.term_end ? ` · Term end ${l.term_end}` : null}
+                </p>
+            )}
+            {l.source === 'pdf' && (
+                <p style={{ background: '#fdf3e0', border: '1px solid #e8c98a', padding: '0.5rem 0.75rem', fontSize: '0.85rem', color: '#5a3500', marginTop: '0.75rem' }}>
+                    Limited information. This legislator's votes appear in roll-call PDFs but we couldn't match them to a current chamber roster — most likely because they left office. First name, party, and district aren't available until backfilled from an external source.
+                </p>
+            )}
 
             <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.5rem', margin: '1.25rem 0' }}>
                 <Stat label="Yea (FP)"    value={t.yea} />

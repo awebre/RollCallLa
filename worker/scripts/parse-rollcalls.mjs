@@ -250,7 +250,7 @@ function mintSynthetic(chamber, displayName, normKey) {
     // Strip any ", X." disambiguator from the display form.
     const cleanLast = displayName.replace(/,\s*[A-Za-z]\.?\s*$/, '').trim();
     syntheticInserts.push(
-        `INSERT INTO legislators (people_id, first_name, last_name, role, active) VALUES (${id}, '', ${escSql(cleanLast)}, ${escSql(chamber === 'S' ? 'Sen' : 'Rep')}, 0) ON CONFLICT(people_id) DO UPDATE SET last_name=excluded.last_name, role=excluded.role;`,
+        `INSERT INTO legislators (people_id, first_name, last_name, role, active, source) VALUES (${id}, '', ${escSql(cleanLast)}, ${escSql(chamber === 'S' ? 'Sen' : 'Rep')}, 0, 'pdf') ON CONFLICT(people_id) DO UPDATE SET last_name=excluded.last_name, role=excluded.role, source='pdf';`,
     );
     return id;
 }
