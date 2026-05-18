@@ -7,9 +7,16 @@ type StatusData = {
     last_refresh_trigger: string | null;
 };
 
-// Tag a refresh as "stale" past this many hours. Refresh job runs nightly, so
-// >36h means at least one run has missed.
-const STALE_HOURS = 36;
+// Tri-state freshness coloring. Refresh job runs nightly, so any healthy
+// state sits below 24h. >24h means at least one scheduled run has missed.
+const FRESH_HOURS = 12;
+const STALE_HOURS = 24;
+
+function freshnessColor(hoursAgo: number): string {
+    if (hoursAgo < FRESH_HOURS) return '#1d6b3a';   // green — fresh
+    if (hoursAgo < STALE_HOURS) return '#7a6a3a';   // amber — getting old
+    return '#a32a2a';                                // red — stale
+}
 
 function relativeTime(iso: string): { label: string; hoursAgo: number } {
     // SQLite's datetime('now') returns 'YYYY-MM-DD HH:MM:SS' in UTC, no 'T' or 'Z'.
@@ -39,13 +46,13 @@ export function Status() {
     let refreshNode = null;
     if (data.last_refresh) {
         const { label, hoursAgo } = relativeTime(data.last_refresh);
-        const stale = hoursAgo > STALE_HOURS;
+        const stale = hoursAgo >= STALE_HOURS;
         refreshNode = (
             <>
                 {' · '}
                 <span
                     title={`Data refreshed ${data.last_refresh} UTC${data.last_refresh_trigger ? ` (${data.last_refresh_trigger})` : ''}`}
-                    style={{ color: stale ? '#a32a2a' : '#666' }}
+                    style={{ color: freshnessColor(hoursAgo), fontWeight: 600 }}
                 >
                     refreshed {label}{stale ? ' (stale)' : ''}
                 </span>
