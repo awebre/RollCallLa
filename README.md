@@ -1,6 +1,7 @@
 # Roll Call LA
 
-A free, public web app for browsing how Louisiana state legislators vote.
+A free, public web app for browsing how Louisiana state legislators vote —
+with per-member voting records and an interactive district map.
 
 **Live:** [roll-call-la.thewebre.com](https://roll-call-la.thewebre.com)
 
@@ -39,6 +40,22 @@ but isn't in the current roster), the UI shows a "PDF-only" or "Term:
 Wikipedia" badge so you know which fields came from the official chamber
 roster and which were reconstructed from secondary sources.
 
+### Don't know your legislator's name?
+
+Use the **District Map** tab. The map shows all 105 House and 39 Senate
+districts in Louisiana, colored by the party of the current seat-holder
+(blue for Democrats, red for Republicans, gray for independent or vacant
+seats), overlaid on a basemap with parishes, roads, and city labels.
+
+- **One click** on a district selects it and shows the seat-holder's name
+  and party in a side panel — without moving the map.
+- **Click the same district again** to zoom in.
+- Or pick a district number from the dropdown — districts are also
+  labeled with the current member's name to help orient.
+
+No address, location, or login is required. The map is purely browse-only;
+nothing about your position or device is sent or stored.
+
 ## How does it work?
 
 A nightly job scrapes three sources, normalizes the data, and pushes it into
@@ -63,6 +80,12 @@ After each refresh, the site shows the latest counts and an updated "last
 refreshed" timestamp. If the refresh fails, the site keeps serving the
 previous snapshot and the masthead colors warn that the data is stale.
 
+District boundaries for the map come from the US Census Bureau's TIGER/Line
+2024 dataset (state legislative district shapefiles, FIPS 22). These reflect
+the post-2022 redistricting maps that Louisiana's legislature is currently
+elected under. The shapefiles are reprojected and simplified at build time
+and shipped as static JSON — no per-request geocoding or address lookups.
+
 ### Where the data is honest about its gaps
 
 - Roll-call PDFs sometimes wrap two members onto one line. The parser does
@@ -73,6 +96,11 @@ previous snapshot and the masthead colors warn that the data is stale.
   can be backfilled from another source.
 - Term dates scraped from Wikipedia are marked as such; the eventual upgrade
   is to pull them from an official source once one becomes available.
+- The district map always shows the *current* district lines and the
+  *current* seat-holders, even when you've selected an older session. The
+  same person may not have represented the same district under the prior
+  map; the map is a "who represents this area today?" view, not a
+  historical lookup.
 
 This is intentionally surfaced in the UI rather than hidden. The point is
 that you can see what we know, what we *don't* know, and where the
