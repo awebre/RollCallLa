@@ -44,6 +44,21 @@ function escSql(v) {
 // "Carter, Sr., Wilford"        -> { last: 'Carter', suffix: 'Sr.', first: 'Wilford' }
 // "Adams, Roy Daryl"             -> { last: 'Adams', first: 'Roy Daryl' }
 // "Beaullieu, IV, Gerald \"Beau\"" -> { last: 'Beaullieu', suffix: 'IV', first: 'Gerald', nickname: 'Beau' }
+// "Barthelemy II, Sidney"        -> { last: 'Barthelemy', suffix: 'II', first: 'Sidney' }
+//   (some rows omit the comma before the suffix; pull it off the trailing
+//   token of the last-name segment so PDFs that print just "Barthelemy"
+//   still match.)
+const TRAILING_SUFFIXES = new Set(['Jr.', 'Jr', 'Sr.', 'Sr', 'II', 'III', 'IV', 'V']);
+
+function splitLastNameSuffix(last) {
+    const tokens = last.split(/\s+/);
+    if (tokens.length >= 2 && TRAILING_SUFFIXES.has(tokens[tokens.length - 1])) {
+        const suffixTok = tokens.pop();
+        return { last: tokens.join(' '), suffix: suffixTok };
+    }
+    return { last, suffix: null };
+}
+
 function splitName(lastFirst) {
     const parts = lastFirst.split(',').map((p) => p.trim()).filter(Boolean);
     let last = '', suffix = null, first = '';
@@ -55,6 +70,11 @@ function splitName(lastFirst) {
         first = parts.slice(2).join(', ');
     } else {
         last = parts[0] ?? '';
+    }
+    if (!suffix) {
+        const stripped = splitLastNameSuffix(last);
+        last = stripped.last;
+        suffix = stripped.suffix;
     }
     let nickname = null;
     const nickMatch = first.match(/"([^"]+)"/);

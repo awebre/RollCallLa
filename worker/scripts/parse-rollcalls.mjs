@@ -131,16 +131,39 @@ function extractDate(text) {
     return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
 }
 
+// Leadership tokens that PDFs glue at the start of a column-collapsed line.
+// We need to peel them off as their own name before falling through to last-name matching.
+const LEADERSHIP_PREFIXES = [
+    'Madam President Pro Tem',
+    'Mr. President Pro Tem',
+    'Mr. President',
+    'Mr. Speaker',
+];
+
 function splitMultiNameLine(line, chamber) {
-    // Senate PDFs sometimes pack two members on one line (column collapse). Use the
-    // chamber's known normalized last-name set to peel names off greedily. We work on
-    // a parallel normalized copy and slice the original line so output keeps display case.
+    // Senate PDFs pack two or three members on one line via column collapse. Peel names
+    // off greedily: try leadership prefix → known last name → single-token fallback.
+    //
+    // The fallback case matters when the *first* name on a line is a departed legislator
+    // not in our current roster (e.g. "Coussan Harris" — Coussan left, Harris is current).
+    // Without this, we'd consume the whole line as one synthetic and miss Harris's vote.
     const lasts = sortedLasts[chamber];
     const out = [];
     let remaining = line.trim();
-    let normRemaining = norm(remaining);
     while (remaining.length > 0) {
         let matched = false;
+
+        for (const prefix of LEADERSHIP_PREFIXES) {
+            if (remaining === prefix || remaining.startsWith(prefix + ' ')) {
+                out.push(prefix);
+                remaining = remaining.slice(prefix.length).trim();
+                matched = true;
+                break;
+            }
+        }
+        if (matched) continue;
+
+        const normRemaining = norm(remaining);
         for (const last of lasts) {
             // Optional ", X." disambiguator follows the last name (e.g. "Carter, R.").
             const re = new RegExp(`^${last.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:,\\s*[a-z]\\.?)?(?=\\s|$)`);
@@ -148,17 +171,34 @@ function splitMultiNameLine(line, chamber) {
             if (m) {
                 out.push(remaining.slice(0, m[0].length));
                 remaining = remaining.slice(m[0].length).trim();
-                normRemaining = norm(remaining);
                 matched = true;
                 break;
             }
         }
-        if (!matched) {
-            out.push(remaining);
-            break;
-        }
+        if (matched) continue;
+
+        // No known prefix matches at the head. Peel a single token (with optional
+        // ", X." disambiguator) and emit it as an unknown name — lookupMember will
+        // mint a synthetic. The remainder gets re-processed on the next iteration so
+        // a known name later in the line still maps to the right person.
+        const tokMatch = remaining.match(/^(\S+(?:,\s*[A-Za-z]\.?)?)/);
+        if (!tokMatch) break;
+        out.push(tokMatch[1]);
+        remaining = remaining.slice(tokMatch[0].length).trim();
     }
     return out;
+}
+
+// Does any whitespace-separated token of the first name start with this initial?
+// Covers cases like first_name "C. Travis" paired with PDF disambig "Johnson, T."
+// — the matcher needs to look past the leading "C." to find Travis.
+function firstNameHasInitial(firstName, initial) {
+    const want = initial.toUpperCase();
+    for (const tok of firstName.split(/\s+/)) {
+        const clean = tok.replace(/^[^A-Za-z]+/, ''); // strip leading "." or "C."
+        if (clean.toUpperCase().startsWith(want)) return true;
+    }
+    return false;
 }
 
 function lookupMember(name, chamber) {
@@ -170,12 +210,12 @@ function lookupMember(name, chamber) {
     // Disambiguator? "Carter, R." -> last="Carter", initial="R"
     const disambig = name.match(/^(.+?),\s*([A-Za-z])\.?$/);
     const last = disambig ? disambig[1].trim() : name.trim();
-    const initial = disambig?.[2]?.toUpperCase() ?? null;
+    const initial = disambig?.[2] ?? null;
     const arr = byChamberLast[chamber].get(norm(last));
     if (!arr) return null;
     if (arr.length === 1) return arr[0];
     if (initial) {
-        const hit = arr.find((l) => l.first_name.toUpperCase().startsWith(initial));
+        const hit = arr.find((l) => firstNameHasInitial(l.first_name, initial));
         if (hit) return hit;
     }
     return null; // ambiguous
