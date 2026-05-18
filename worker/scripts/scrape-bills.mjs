@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 
 import { parseVotePage } from '../src/worker/votepage.ts';
+import { parseSession, sessionIdFor, isSpecialSession } from '../src/worker/session-id.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -125,15 +126,16 @@ const sqlChunks = [];
 sqlChunks.push(`-- Scraped from legis.la.gov for session ${SESSION}`);
 sqlChunks.push(`-- ${new Date().toISOString()}`);
 
-// Session row. The session_id is synthetic from sid string: 24RS -> 24001 ; 24ES -> 24002 etc.
-// LegiScan-stable IDs come later if we ever swap to that source.
-const yearPart = Number(SESSION.slice(0, 2)) + 2000;
-const kindCode = { RS: 1, ES: 2, ES1: 3, ES2: 4, ES3: 5 }[SESSION.slice(2)] ?? 9;
-const sessionId = Number(SESSION.slice(0, 2)) * 1000 + kindCode;
+// Session row. session_id derived from the legis.la.gov sid string — see
+// src/worker/session-id.ts for the encoding. Keeps existing 24RS=24001 /
+// 26RS=26001 stable while giving each ES/VS of a year a distinct id.
+const sessionParsed = parseSession(SESSION);
+const sessionId = sessionIdFor(SESSION);
+const special = isSpecialSession(SESSION) ? 1 : 0;
 sqlChunks.push(
     `INSERT INTO sessions (session_id, name, year_start, year_end, special) VALUES (${sessionId}, ${escSql(
         SESSION,
-    )}, ${yearPart}, ${yearPart}, ${SESSION.includes('ES') ? 1 : 0}) ON CONFLICT(session_id) DO UPDATE SET name=excluded.name, year_start=excluded.year_start, year_end=excluded.year_end, special=excluded.special;`,
+    )}, ${sessionParsed.year}, ${sessionParsed.year}, ${special}) ON CONFLICT(session_id) DO UPDATE SET name=excluded.name, year_start=excluded.year_start, year_end=excluded.year_end, special=excluded.special;`,
 );
 
 // Synthetic bill_id keeps things stable per session: <session>_<type-index>_<num>.
