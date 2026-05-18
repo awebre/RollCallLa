@@ -43,15 +43,19 @@ roster and which were reconstructed from secondary sources.
 ### Don't know your legislator's name?
 
 Use the **District Map** tab. The map shows all 105 House and 39 Senate
-districts in Louisiana, colored by the party of the current seat-holder
-(blue for Democrats, red for Republicans, gray for independent or vacant
-seats), overlaid on a basemap with parishes, roads, and city labels.
+districts in Louisiana, colored by the party of the person who held the
+seat *during the session you've selected* (blue for Democrats, red for
+Republicans, gray for independent or vacant seats), overlaid on a
+basemap with parishes, roads, and city labels.
 
 - **One click** on a district selects it and shows the seat-holder's name
   and party in a side panel — without moving the map.
 - **Click the same district again** to zoom in.
-- Or pick a district number from the dropdown — districts are also
-  labeled with the current member's name to help orient.
+- Or pick a district number from the dropdown — districts are labeled
+  with the seat-holder's name to help orient.
+- If more than one person held the seat during the selected session (a
+  mid-term resignation or a special election, for example), the panel
+  lists each member with their term dates.
 
 No address, location, or login is required. The map is purely browse-only;
 nothing about your position or device is sent or stored.
@@ -96,11 +100,14 @@ and shipped as static JSON — no per-request geocoding or address lookups.
   can be backfilled from another source.
 - Term dates scraped from Wikipedia are marked as such; the eventual upgrade
   is to pull them from an official source once one becomes available.
-- The district map always shows the *current* district lines and the
-  *current* seat-holders, even when you've selected an older session. The
-  same person may not have represented the same district under the prior
-  map; the map is a "who represents this area today?" view, not a
-  historical lookup.
+- The district map currently ships with the post-2022 redistricting
+  boundaries only — the lines actually used for the 2024 sessions
+  onward. Seat-holders are session-aware, so the map correctly shows
+  who held each seat for the session you've picked, but if you select a
+  session held under the older (pre-October 2023) maps the boundary
+  outlines won't match the lines those legislators were elected under.
+  Supporting historical boundaries is a planned addition once older
+  sessions are imported.
 
 This is intentionally surfaced in the UI rather than hidden. The point is
 that you can see what we know, what we *don't* know, and where the
