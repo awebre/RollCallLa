@@ -1,13 +1,13 @@
 name: Refresh legislative data
 
-# Runs the scrape pipeline against legis.la.gov and pushes the resulting SQL to
-# remote D1. The plan calls for weekly refresh during a live session. Cron is in
-# UTC (0 11 * * 1 ≈ 5-6 am Central depending on DST) — adjust if you want a
-# different cadence.
+# Scrapes legis.la.gov + Wikipedia and pushes the resulting SQL to remote D1.
+# Runs nightly during session windows; off-session, most fetches are cache hits
+# so the cost stays bounded. Cron is in UTC (0 11 * * * ≈ 5-6 am Central
+# depending on DST).
 
 on:
   schedule:
-    - cron: '0 11 * * 1'
+    - cron: '0 11 * * *'
   workflow_dispatch:
     inputs:
       session:
@@ -26,6 +26,7 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
+      issues: write
     defaults:
       run:
         working-directory: worker
@@ -33,6 +34,9 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       SESSION: ${{ github.event.inputs.session || '26RS' }}
+      # Scripts that read from D1 honor this — locally defaults to --local,
+      # in CI we want every SELECT to hit remote production.
+      D1_TARGET: remote
     steps:
       - uses: actions/checkout@v5
 
@@ -53,6 +57,16 @@ jobs:
           key: scrape-cache-${{ env.SESSION }}-${{ github.run_id }}
           restore-keys: |
             scrape-cache-${{ env.SESSION }}-
+
+      # Record the start of this refresh in ingest_runs so the API can surface
+      # a "last refresh" timestamp and the UI can flag stale data. The row gets
+      # status='running' first, finalized to 'success' or 'error' at the end.
+      - name: Record ingest start
+        run: |
+          npx wrangler d1 execute la_vote_tracker --remote --command "
+            INSERT INTO ingest_runs (started_at, trigger, status)
+            VALUES (datetime('now'), '${{ github.event_name == 'schedule' && 'cron' || 'manual' }}', 'running');
+          "
 
       - name: Scrape rosters (Senate + House)
         run: node scripts/scrape-rosters.mjs /tmp/rosters.sql
@@ -84,6 +98,26 @@ jobs:
       - name: Push term provenance to remote D1
         run: npx wrangler d1 execute la_vote_tracker --remote --file /tmp/wiki_terms.sql
 
+      # Mark the most recent 'running' row as 'success' with current timestamp.
+      # Done as the LAST step so it only fires when every prior step passed.
+      - name: Record ingest success
+        run: |
+          npx wrangler d1 execute la_vote_tracker --remote --command "
+            UPDATE ingest_runs
+            SET finished_at = datetime('now'), status = 'success'
+            WHERE id = (SELECT MAX(id) FROM ingest_runs WHERE status = 'running');
+          "
+
+      - name: Record ingest failure
+        if: failure()
+        run: |
+          npx wrangler d1 execute la_vote_tracker --remote --command "
+            UPDATE ingest_runs
+            SET finished_at = datetime('now'), status = 'error',
+                error = 'See GitHub Actions run ${{ github.run_id }}'
+            WHERE id = (SELECT MAX(id) FROM ingest_runs WHERE status = 'running');
+          "
+
       # If anything in the pipeline failed, open an issue so the broken cron
       # is visible instead of silently serving stale data. Only fires on
       # scheduled runs to avoid noise from manual ad-hoc invocations.
@@ -94,7 +128,7 @@ jobs:
           script: |
             const title = `refresh-data failed on ${new Date().toISOString().slice(0,10)}`;
             const body = [
-              'The weekly data-refresh workflow failed. Stale data will be served until the next successful run.',
+              'The nightly data-refresh workflow failed. Stale data will be served until the next successful run.',
               '',
               `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
             ].join('\n');
