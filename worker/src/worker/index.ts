@@ -69,6 +69,12 @@ app.get('/api/legislators', async (c) => {
 app.get('/api/legislators/:id', async (c) => {
     const id = Number(c.req.param('id'));
     if (!Number.isFinite(id)) return c.json({ error: 'bad id' }, 400);
+    const sessionId = Number(c.req.query('session_id')) || null;
+
+    // Scope tallies + party-line to the requested session when provided. The bill join
+    // is what carries session_id, so it gets added wherever roll_calls is involved.
+    const sessionClause = sessionId ? 'AND b.session_id = ?' : '';
+    const sessionBindsFor = (base: (string | number)[]) => (sessionId ? [...base, sessionId] : base);
 
     const [profile, tally, partyLine] = await c.env.DB.batch([
         c.env.DB.prepare(
@@ -80,9 +86,10 @@ app.get('/api/legislators/:id', async (c) => {
             `SELECT vote, COUNT(*) AS n
              FROM votes v
              JOIN roll_calls rc ON rc.roll_call_id = v.roll_call_id
-             WHERE v.people_id = ? AND rc.vote_category = 'final_passage'
+             JOIN bills b       ON b.bill_id      = rc.bill_id
+             WHERE v.people_id = ? AND rc.vote_category = 'final_passage' ${sessionClause}
              GROUP BY vote`,
-        ).bind(id),
+        ).bind(...sessionBindsFor([id])),
         // For each roll call, % of same-party members who took the same position.
         // Used to surface "party-line" tendency in the summary card.
         c.env.DB.prepare(
@@ -93,17 +100,18 @@ app.get('/api/legislators/:id', async (c) => {
                 SELECT v.roll_call_id, v.vote, v2.vote AS other_vote
                 FROM votes v
                 JOIN roll_calls rc ON rc.roll_call_id = v.roll_call_id
+                JOIN bills b       ON b.bill_id      = rc.bill_id
                 JOIN votes v2 ON v2.roll_call_id = v.roll_call_id AND v2.people_id != v.people_id
                 JOIN legislators l2 ON l2.people_id = v2.people_id
                 JOIN legi ON legi.party = l2.party AND legi.role = l2.role
                 WHERE v.people_id = ? AND rc.vote_category = 'final_passage'
-                  AND v.vote IN (1, 2)
+                  AND v.vote IN (1, 2) ${sessionClause}
              )
              SELECT
                 COUNT(*) FILTER (WHERE vote = other_vote) AS aligned,
                 COUNT(*) AS total
              FROM same_party_votes`,
-        ).bind(id, id),
+        ).bind(...sessionBindsFor([id, id])),
     ]);
 
     if (profile.results.length === 0) return c.json({ error: 'not found' }, 404);

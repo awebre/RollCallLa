@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Legislator, LegislatorVoteRow } from '../types';
 import { formatName, partyColor, voteColor, VOTE_LABEL } from '../types';
+import { useSession } from '../SessionContext';
 
 type Profile = {
     legislator: Legislator;
@@ -9,6 +10,8 @@ type Profile = {
 };
 
 export function LegislatorDetail({ id }: { id: number }) {
+    const { current } = useSession();
+    const sessionId = current?.session_id ?? null;
     const [profile, setProfile] = useState<Profile | null>(null);
     const [votes, setVotes] = useState<LegislatorVoteRow[]>([]);
     const [loading, setLoading] = useState(true);
@@ -18,11 +21,17 @@ export function LegislatorDetail({ id }: { id: number }) {
     const [q, setQ] = useState('');
 
     useEffect(() => {
-        fetch(`/api/legislators/${id}`).then((r) => r.json() as Promise<Profile>).then(setProfile);
-    }, [id]);
+        const params = new URLSearchParams();
+        if (sessionId) params.set('session_id', String(sessionId));
+        fetch(`/api/legislators/${id}?${params.toString()}`)
+            .then((r) => r.json() as Promise<Profile>)
+            .then(setProfile);
+    }, [id, sessionId]);
 
     useEffect(() => {
+        if (sessionId === null) return;
         const params = new URLSearchParams();
+        params.set('session_id', String(sessionId));
         if (category) params.set('category', category);
         if (vote) params.set('vote', vote);
         if (closeOnly) params.set('close', '1');
@@ -33,7 +42,7 @@ export function LegislatorDetail({ id }: { id: number }) {
             .then((r) => r.json() as Promise<{ votes: LegislatorVoteRow[] }>)
             .then((d) => setVotes(d.votes))
             .finally(() => setLoading(false));
-    }, [id, category, vote, closeOnly, q]);
+    }, [id, sessionId, category, vote, closeOnly, q]);
 
     if (!profile) return <p style={{ color: '#666' }}>Loading legislator…</p>;
     const { legislator: l, final_passage_tally: t, party_line } = profile;
