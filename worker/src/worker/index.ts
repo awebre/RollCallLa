@@ -190,7 +190,7 @@ app.get('/api/legislators/:id/votes', async (c) => {
         JOIN roll_calls rc ON rc.roll_call_id = v.roll_call_id
         JOIN bills b       ON b.bill_id      = rc.bill_id
         WHERE v.people_id = ?
-        ${where.length > 1 ? 'AND ' + where.slice(1).join(' AND ') : ''}
+        ${where.length > 0 ? 'AND ' + where.join(' AND ') : ''}
         ORDER BY rc.date DESC, rc.roll_call_id DESC
         LIMIT ${limit} OFFSET ${offset}
     `;
