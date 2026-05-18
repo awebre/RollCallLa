@@ -64,7 +64,7 @@ function runD1(cmd) {
 
 console.error('Loading legislators...');
 const legislatorsRaw = runD1(
-    `SELECT people_id, first_name, last_name, role FROM legislators WHERE active = 1`,
+    `SELECT people_id, first_name, last_name, role, year_elected FROM legislators WHERE active = 1`,
 );
 
 // Normalize for matching: lowercase + strip diacritics. PDFs use ASCII; the roster has
@@ -201,7 +201,7 @@ function firstNameHasInitial(firstName, initial) {
     return false;
 }
 
-function lookupMember(name, chamber) {
+function lookupMember(name, chamber, rollCallYear) {
     const leader = LEADERSHIP_24RS[name];
     if (leader) {
         const map = byChamberLast[leader.chamber];
@@ -213,9 +213,15 @@ function lookupMember(name, chamber) {
     const initial = disambig?.[2] ?? null;
     const arr = byChamberLast[chamber].get(norm(last));
     if (!arr) return null;
-    if (arr.length === 1) return arr[0];
+    // Term filter: someone elected after the roll call's year wasn't seated yet.
+    // Resolves 24RS "Henry" automatically when Dana Henry's year_elected = 2026.
+    const eligible = rollCallYear
+        ? arr.filter((l) => l.year_elected == null || l.year_elected <= rollCallYear)
+        : arr;
+    if (eligible.length === 1) return eligible[0];
+    if (eligible.length === 0) return null;
     if (initial) {
-        const hit = arr.find((l) => firstNameHasInitial(l.first_name, initial));
+        const hit = eligible.find((l) => firstNameHasInitial(l.first_name, initial));
         if (hit) return hit;
     }
     return null; // ambiguous
@@ -262,6 +268,8 @@ for (const rc of rollCalls) {
     const tallies = { 1: 0, 2: 0, 3: 0, 4: 0 };
     const voters = []; // { people_id, vote }
     let currentVote = null;
+    const dateStr = extractDate(text);
+    const rollCallYear = dateStr ? Number(dateStr.slice(0, 4)) : null;
 
     for (const line of lines) {
         const sec = line.match(SECTION_RE);
@@ -280,7 +288,7 @@ for (const rc of rollCalls) {
 
         const names = splitMultiNameLine(line, rc.chamber);
         for (const name of names) {
-            const member = lookupMember(name, rc.chamber);
+            const member = lookupMember(name, rc.chamber, rollCallYear);
             let peopleId;
             if (member) {
                 peopleId = member.people_id;
@@ -297,7 +305,7 @@ for (const rc of rollCalls) {
         }
     }
 
-    const date = extractDate(text) ?? '1970-01-01';
+    const date = dateStr ?? '1970-01-01';
     const yea = tallies[1], nay = tallies[2], nv = tallies[3], absent = tallies[4];
     const total = yea + nay + nv + absent;
     const passed = yea > nay ? 1 : 0;

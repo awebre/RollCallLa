@@ -17,6 +17,7 @@
     "db:reset:local": "rm -rf .wrangler/state/v3/d1 && npm run db:migrate:local",
     "scrape:rosters": "node scripts/scrape-rosters.mjs /tmp/rosters.sql && wrangler d1 execute DB --local --file /tmp/rosters.sql",
     "scrape:bills": "node --experimental-strip-types scripts/scrape-bills.mjs",
+    "scrape:terms": "node scripts/scrape-term-dates.mjs && wrangler d1 execute DB --local --file /tmp/term_dates.sql",
     "parse:rollcalls": "node --experimental-strip-types scripts/parse-rollcalls.mjs",
     "test": "vitest run"
   },
