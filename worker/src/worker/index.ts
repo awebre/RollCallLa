@@ -15,12 +15,37 @@ app.get('/api/sessions', async (c) => {
 });
 
 app.get('/api/status', async (c) => {
-    const [bills, rolls, votes, legs] = await c.env.DB.batch([
-        c.env.DB.prepare(`SELECT COUNT(*) AS n FROM bills`),
-        c.env.DB.prepare(`SELECT COUNT(*) AS n FROM roll_calls`),
-        c.env.DB.prepare(`SELECT COUNT(*) AS n FROM votes`),
-        c.env.DB.prepare(`SELECT COUNT(*) AS n FROM legislators WHERE active = 1`),
-    ]);
+    const sessionId = Number(c.req.query('session_id')) || null;
+    // When session_id is supplied, scope counts to that session. The legislators count
+    // becomes "distinct members who voted in this session" — honest about turnover.
+    const queries = sessionId
+        ? [
+            c.env.DB.prepare(`SELECT COUNT(*) AS n FROM bills WHERE session_id = ?`).bind(sessionId),
+            c.env.DB.prepare(
+                `SELECT COUNT(*) AS n FROM roll_calls rc
+                 JOIN bills b ON b.bill_id = rc.bill_id
+                 WHERE b.session_id = ?`,
+            ).bind(sessionId),
+            c.env.DB.prepare(
+                `SELECT COUNT(*) AS n FROM votes v
+                 JOIN roll_calls rc ON rc.roll_call_id = v.roll_call_id
+                 JOIN bills b       ON b.bill_id      = rc.bill_id
+                 WHERE b.session_id = ?`,
+            ).bind(sessionId),
+            c.env.DB.prepare(
+                `SELECT COUNT(DISTINCT v.people_id) AS n FROM votes v
+                 JOIN roll_calls rc ON rc.roll_call_id = v.roll_call_id
+                 JOIN bills b       ON b.bill_id      = rc.bill_id
+                 WHERE b.session_id = ?`,
+            ).bind(sessionId),
+        ]
+        : [
+            c.env.DB.prepare(`SELECT COUNT(*) AS n FROM bills`),
+            c.env.DB.prepare(`SELECT COUNT(*) AS n FROM roll_calls`),
+            c.env.DB.prepare(`SELECT COUNT(*) AS n FROM votes`),
+            c.env.DB.prepare(`SELECT COUNT(*) AS n FROM legislators WHERE active = 1`),
+        ];
+    const [bills, rolls, votes, legs] = await c.env.DB.batch(queries);
     c.header('cache-control', CACHE);
     return c.json({
         counts: {
@@ -29,6 +54,7 @@ app.get('/api/status', async (c) => {
             votes: (votes.results[0] as { n: number }).n,
             active_legislators: (legs.results[0] as { n: number }).n,
         },
+        scoped_to_session: sessionId,
         last_refresh: null,
     });
 });
