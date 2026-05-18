@@ -213,8 +213,10 @@ app.get('/api/rollcalls/:id', async (c) => {
 
     const [head, members] = await c.env.DB.batch([
         c.env.DB.prepare(
-            `SELECT rc.*, b.bill_number, b.title
-             FROM roll_calls rc JOIN bills b ON b.bill_id = rc.bill_id
+            `SELECT rc.*, b.bill_number, b.title, s.name AS session_name
+             FROM roll_calls rc
+             JOIN bills b      ON b.bill_id      = rc.bill_id
+             JOIN sessions s   ON s.session_id   = b.session_id
              WHERE rc.roll_call_id = ?`,
         ).bind(id),
         c.env.DB.prepare(

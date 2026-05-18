@@ -14,6 +14,8 @@ type RollCallHead = {
     yea: number; nay: number; nv: number; absent: number; total: number;
     passed: number;
     margin: number;
+    pdf_doc_id: number | null;
+    session_name: string;
 };
 
 export function RollCallDetail({ id }: { id: number }) {
@@ -55,6 +57,29 @@ export function RollCallDetail({ id }: { id: number }) {
             <p style={{ color: head.passed ? '#1d6b3a' : '#a32a2a', fontWeight: 700, fontFamily: 'ui-monospace, monospace' }}>
                 {head.passed ? 'PASSED' : 'FAILED'}
                 {'  '}Yea {head.yea} · Nay {head.nay} · NV {head.nv} · Absent {head.absent} · margin {head.margin}
+            </p>
+            <p style={{ fontSize: '0.85rem' }}>
+                <a
+                    href={`https://legis.la.gov/legis/BillInfo.aspx?s=${head.session_name}&b=${encodeURIComponent(head.bill_number)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ color: '#1f5fa6' }}
+                >
+                    {head.bill_number} on legis.la.gov ↗
+                </a>
+                {head.pdf_doc_id && (
+                    <>
+                        {'  ·  '}
+                        <a
+                            href={`https://legis.la.gov/legis/ViewDocument.aspx?d=${head.pdf_doc_id}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ color: '#1f5fa6' }}
+                        >
+                            roll-call PDF ↗
+                        </a>
+                    </>
+                )}
             </p>
 
             <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginTop: '1.5rem' }}>

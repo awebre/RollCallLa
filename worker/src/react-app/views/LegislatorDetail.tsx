@@ -119,7 +119,18 @@ export function LegislatorDetail({ id }: { id: number }) {
                     {votes.map((v) => (
                         <tr key={v.roll_call_id} style={{ borderBottom: '1px solid #eee' }}>
                             <td style={{ padding: '0.4rem 0.25rem', whiteSpace: 'nowrap' }}>{v.date}</td>
-                            <td style={{ padding: '0.4rem 0.25rem' }}>{v.bill_number}</td>
+                            <td style={{ padding: '0.4rem 0.25rem' }}>
+                                {current ? (
+                                    <a
+                                        href={`https://legis.la.gov/legis/BillInfo.aspx?s=${current.name}&b=${encodeURIComponent(v.bill_number)}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        style={{ color: '#1f5fa6' }}
+                                    >
+                                        {v.bill_number}
+                                    </a>
+                                ) : v.bill_number}
+                            </td>
                             <td style={{ padding: '0.4rem 0.25rem' }}>
                                 <a href={`#/rollcall/${v.roll_call_id}`} style={{ color: '#1a1a1a' }}>
                                     {v.description}
