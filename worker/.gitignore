@@ -15,6 +15,7 @@ dist-ssr
 .wrangler
 .dev.vars
 .scrape-cache
+.build-cache
 
 # Editor directories and files
 .vscode/*
