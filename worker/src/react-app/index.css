@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 :root {
   --text: #6b6375;
   --text-h: #08060d;
@@ -41,7 +43,7 @@
   --app-navy-active-bg: #1e3a5f;
   --app-navy-active-text: #ffffff;
   --app-navy-inactive-text: #1e3a5f;
-  --app-navy-count-bg: rgba(30, 58, 95, 0.10);
+  --app-navy-count-bg: rgba(30, 58, 95, 0.1);
   --app-navy-count-text: #1e3a5f;
   --app-navy-count-active-bg: rgba(255, 255, 255, 0.18);
   --party-d: #1f5fa6;
@@ -53,8 +55,8 @@
   --vote-nv: #7a6a3a;
   --vote-absent: #5a5a5a;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --sans: system-ui, "Segoe UI", Roboto, sans-serif;
+  --heading: system-ui, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
   font: 18px/145% var(--sans);
@@ -117,7 +119,7 @@
     --app-navy-inactive-text: #93c5fd;
     --app-navy-count-bg: rgba(147, 197, 253, 0.12);
     --app-navy-count-text: #93c5fd;
-    --app-navy-count-active-bg: rgba(255, 255, 255, 0.20);
+    --app-navy-count-active-bg: rgba(255, 255, 255, 0.2);
     --party-d: #60a5fa;
     --party-r: #f87171;
     --party-i: #b0b7c3;
@@ -131,6 +133,12 @@
   #social .button-icon {
     filter: invert(1) brightness(2);
   }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 #root {
@@ -192,4 +200,3 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
-

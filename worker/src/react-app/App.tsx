@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useState } from 'react';
 import { Roster } from './views/Roster';
 import { LegislatorDetail } from './views/LegislatorDetail';
 import { RollCallDetail } from './views/RollCallDetail';
@@ -29,22 +29,14 @@ function App() {
     const { path, param } = useHashRoute();
     return (
         <SessionProvider>
-            <main
-                style={{
-                    maxWidth: 1040,
-                    margin: '0 auto',
-                    padding: '2rem 1rem 4rem',
-                    fontFamily: 'Georgia, "Times New Roman", serif',
-                    color: 'var(--app-ink)',
-                }}
-            >
-                <header style={{ borderBottom: '2px solid var(--app-ink)', paddingBottom: '0.5rem', marginBottom: '0.75rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '1rem', flexWrap: 'wrap' }}>
-                        <a href="#/" style={{ color: 'inherit', textDecoration: 'none', textAlign: 'left' }}>
-                            <h1 style={{ margin: 0, fontSize: '2.25rem', letterSpacing: '-0.02em', lineHeight: 1 }}>
+            <main className="box-border mx-auto w-full max-w-260 px-4 pt-8 pb-16 font-serif text-(--app-ink)">
+                <header className="mb-3 border-b-2 border-(--app-ink) pb-2">
+                    <div className="flex flex-wrap items-end justify-between gap-4">
+                        <a href="#/" className="text-left no-underline text-inherit">
+                            <h1 className="m-0 text-4xl leading-none tracking-[-0.02em]">
                                 Roll Call LA
                             </h1>
-                            <p style={{ margin: '0.2rem 0 0', fontSize: '0.9rem', color: 'var(--app-subtitle)', fontStyle: 'italic', letterSpacing: '0.01em' }}>
+                            <p className="mt-[0.2rem] mb-0 text-[0.9rem] tracking-[0.01em] text-(--app-subtitle) italic">
                                 Louisiana Legislator Vote Tracker
                             </p>
                         </a>
@@ -52,9 +44,9 @@ function App() {
                     </div>
                     <Status />
                 </header>
-                <nav style={{ display: 'flex', gap: '1.25rem', marginBottom: '1.25rem', fontSize: '0.95rem' }}>
-                    <a href="#/" style={navLinkStyle(path === 'roster')}>Roster</a>
-                    <a href="#/map" style={navLinkStyle(path === 'map')}>District Map</a>
+                <nav className="mb-5 flex gap-5 text-[0.95rem]">
+                    <a href="#/" className={navLinkClass(path === 'roster')}>Roster</a>
+                    <a href="#/map" className={navLinkClass(path === 'map')}>District Map</a>
                 </nav>
 
                 {path === 'roster' && <Roster />}
@@ -66,14 +58,8 @@ function App() {
     );
 }
 
-function navLinkStyle(active: boolean): CSSProperties {
-    return {
-        color: active ? 'var(--app-ink)' : 'var(--app-subtitle)',
-        textDecoration: 'none',
-        borderBottom: active ? '2px solid var(--app-ink)' : '2px solid transparent',
-        paddingBottom: '0.15rem',
-        fontWeight: active ? 600 : 500,
-    };
+function navLinkClass(active: boolean): string {
+    return `border-b-2 pb-[0.15rem] no-underline ${active ? 'border-(--app-ink) text-(--app-ink) font-semibold' : 'border-transparent text-(--app-subtitle) font-medium'}`;
 }
 
 export default App;
