@@ -40,6 +40,11 @@ export function DistrictMap() {
     const mlRef = useRef<any>(null);
     const prevSelectedRef = useRef<number | null>(null);
     const geoRef = useRef<FC | null>(null);
+    // The map-click handler is registered inside the layer-setup effect, which only
+    // re-runs on chamber change. To let it read the *current* selection (for the
+    // "click again to zoom" behavior) without recreating the listener every render,
+    // we keep selection in a ref synchronized to React state.
+    const selectedDistrictRef = useRef<number | null>(null);
 
     useEffect(() => {
         fetch('/api/legislators?active=1')
@@ -216,7 +221,14 @@ export function DistrictMap() {
             };
             const onClick = (e: { features?: Array<{ properties: { district: number } }> }) => {
                 if (!e.features?.length) return;
-                setSelectedDistrict(e.features[0].properties.district);
+                const d = e.features[0].properties.district;
+                // First click on a polygon just selects it (panel updates, no camera move).
+                // Clicking the already-selected polygon a second time zooms to its bounds.
+                if (selectedDistrictRef.current === d) {
+                    zoomToDistrict(d);
+                } else {
+                    setSelectedDistrict(d);
+                }
             };
             map.on('mousemove', 'districts-fill', onMove);
             map.on('mouseleave', 'districts-fill', onLeave);
@@ -231,7 +243,15 @@ export function DistrictMap() {
         setSelectedDistrict(null);
     }, [chamber]);
 
-    // Sync map highlight + fitBounds with the selected district (both click and dropdown paths).
+    // Keep the selected-district ref in sync with state so map-click handlers
+    // (registered once per chamber) see the current selection.
+    useEffect(() => {
+        selectedDistrictRef.current = selectedDistrict;
+    }, [selectedDistrict]);
+
+    // Sync map highlight with the selected district. Camera moves (fitBounds)
+    // are handled separately by zoomToDistrict() — invoked on second-click of
+    // an already-selected polygon or when the user picks from the dropdown.
     useEffect(() => {
         const map = mapRef.current;
         if (!mapReady || !map || !map.getSource('districts')) return;
@@ -241,15 +261,16 @@ export function DistrictMap() {
         prevSelectedRef.current = selectedDistrict;
         if (selectedDistrict !== null) {
             map.setFeatureState({ source: 'districts', id: selectedDistrict }, { selected: true });
-            const feat = geoRef.current?.features.find((f) => f.properties.district === selectedDistrict);
-            if (feat) {
-                const b = bboxOf(feat.geometry);
-                if (b) {
-                    map.fitBounds(b, { padding: 60, duration: 600, maxZoom: 10 });
-                }
-            }
         }
     }, [selectedDistrict, mapReady]);
+
+    function zoomToDistrict(d: number) {
+        const map = mapRef.current;
+        const feat = geoRef.current?.features.find((f) => f.properties.district === d);
+        if (!map || !feat) return;
+        const b = bboxOf(feat.geometry);
+        if (b) map.fitBounds(b, { padding: 60, duration: 600, maxZoom: 11 });
+    }
 
     const selectedLeg = selectedDistrict !== null ? byKey.get(`${ROLE[chamber]}-${selectedDistrict}`) ?? null : null;
 
@@ -288,7 +309,14 @@ export function DistrictMap() {
                     <span style={legendStyle}>District</span>
                     <select
                         value={selectedDistrict ?? ''}
-                        onChange={(e) => setSelectedDistrict(e.target.value ? Number(e.target.value) : null)}
+                        onChange={(e) => {
+                            const v = e.target.value ? Number(e.target.value) : null;
+                            setSelectedDistrict(v);
+                            // Dropdown is an explicit "take me there" gesture — zoom in
+                            // so the picked district is centered, unlike the map-click
+                            // path which keeps the camera still on the first click.
+                            if (v !== null) zoomToDistrict(v);
+                        }}
                         style={{ padding: '0.5rem', fontSize: '1rem', border: '1px solid #bbb', background: '#fff' }}
                     >
                         <option value="">— pick a district —</option>
