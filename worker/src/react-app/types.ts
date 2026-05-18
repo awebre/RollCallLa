@@ -58,3 +58,19 @@ export function voteColor(v: number) {
     if (v === 3) return '#7a6a3a';
     return '#5a5a5a';
 }
+
+// "24RS" -> "2024 Regular Session"
+// "24ES" -> "2024 Extraordinary Session"
+// "24ES2" -> "2024 2nd Extraordinary Session"
+// Anything else -> fall back to raw `name`.
+export function formatSessionName(name: string, year_start: number): string {
+    const tail = name.replace(/^\d+/, '');
+    if (tail === 'RS') return `${year_start} Regular Session`;
+    const esMatch = tail.match(/^ES(\d*)$/);
+    if (esMatch) {
+        const n = esMatch[1] ? Number(esMatch[1]) : 1;
+        const ord = ['1st', '2nd', '3rd', '4th', '5th', '6th'][n - 1] ?? `${n}th`;
+        return `${year_start} ${ord} Extraordinary Session`;
+    }
+    return name;
+}
