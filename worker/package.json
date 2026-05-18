@@ -14,7 +14,8 @@
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "db:console:local": "wrangler d1 execute DB --local --command",
-    "db:reset:local": "rm -rf .wrangler/state/v3/d1 && npm run db:migrate:local"
+    "db:reset:local": "rm -rf .wrangler/state/v3/d1 && npm run db:migrate:local",
+    "scrape:rosters": "node scripts/scrape-rosters.mjs /tmp/rosters.sql && wrangler d1 execute DB --local --file /tmp/rosters.sql"
   },
   "dependencies": {
     "hono": "^4.12.19",
