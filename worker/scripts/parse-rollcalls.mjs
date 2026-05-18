@@ -64,7 +64,8 @@ function runD1(cmd) {
 
 console.error('Loading legislators...');
 const legislatorsRaw = runD1(
-    `SELECT people_id, first_name, last_name, role, year_elected FROM legislators WHERE active = 1`,
+    `SELECT people_id, first_name, last_name, role, year_elected, term_start, term_end
+     FROM legislators WHERE active = 1`,
 );
 
 // Normalize for matching: lowercase + strip diacritics. PDFs use ASCII; the roster has
@@ -201,7 +202,7 @@ function firstNameHasInitial(firstName, initial) {
     return false;
 }
 
-function lookupMember(name, chamber, rollCallYear) {
+function lookupMember(name, chamber, rollCallDate) {
     const leader = LEADERSHIP_24RS[name];
     if (leader) {
         const map = byChamberLast[leader.chamber];
@@ -213,10 +214,19 @@ function lookupMember(name, chamber, rollCallYear) {
     const initial = disambig?.[2] ?? null;
     const arr = byChamberLast[chamber].get(norm(last));
     if (!arr) return null;
-    // Term filter: someone elected after the roll call's year wasn't seated yet.
-    // Resolves 24RS "Henry" automatically when Dana Henry's year_elected = 2026.
-    const eligible = rollCallYear
-        ? arr.filter((l) => l.year_elected == null || l.year_elected <= rollCallYear)
+
+    // Term filter: drop candidates whose tenure doesn't include this roll call.
+    //   year_elected > roll-call year     -> not yet elected
+    //   term_start    > roll-call date    -> not yet sworn in (special election joiner)
+    //   term_end      < roll-call date    -> already departed
+    const eligible = rollCallDate
+        ? arr.filter((l) => {
+            const year = Number(rollCallDate.slice(0, 4));
+            if (l.year_elected != null && l.year_elected > year) return false;
+            if (l.term_start && l.term_start > rollCallDate) return false;
+            if (l.term_end && l.term_end < rollCallDate) return false;
+            return true;
+        })
         : arr;
     if (eligible.length === 1) return eligible[0];
     if (eligible.length === 0) return null;
@@ -269,7 +279,6 @@ for (const rc of rollCalls) {
     const voters = []; // { people_id, vote }
     let currentVote = null;
     const dateStr = extractDate(text);
-    const rollCallYear = dateStr ? Number(dateStr.slice(0, 4)) : null;
 
     for (const line of lines) {
         const sec = line.match(SECTION_RE);
@@ -288,7 +297,7 @@ for (const rc of rollCalls) {
 
         const names = splitMultiNameLine(line, rc.chamber);
         for (const name of names) {
-            const member = lookupMember(name, rc.chamber, rollCallYear);
+            const member = lookupMember(name, rc.chamber, dateStr);
             let peopleId;
             if (member) {
                 peopleId = member.people_id;
