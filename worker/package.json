@@ -1,0 +1,50 @@
+{
+  "name": "worker",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "npm run build && vite preview",
+    "deploy": "npm run build && wrangler deploy",
+    "cf-typegen": "wrangler types",
+    "check": "tsc && vite build && wrangler deploy --dry-run",
+    "db:migrate:local": "wrangler d1 migrations apply la_vote_tracker --local",
+    "db:migrate:remote": "wrangler d1 migrations apply la_vote_tracker --remote",
+    "db:console:local": "wrangler d1 execute la_vote_tracker --local --command",
+    "db:reset:local": "rm -rf .wrangler/state/v3/d1 && npm run db:migrate:local",
+    "scrape:rosters": "node scripts/scrape-rosters.mjs /tmp/rosters.sql && wrangler d1 execute la_vote_tracker --local --file /tmp/rosters.sql",
+    "scrape:bills": "node --experimental-strip-types scripts/scrape-bills.mjs",
+    "scrape:terms": "node scripts/scrape-term-dates.mjs && wrangler d1 execute la_vote_tracker --local --file /tmp/term_dates.sql",
+    "parse:rollcalls": "node --experimental-strip-types scripts/parse-rollcalls.mjs",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "hono": "^4.12.19",
+    "pdf-parse": "^2.4.5",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.37.1",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.12.3",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "eslint": "^10.3.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.6.0",
+    "typescript": "~6.0.2",
+    "typescript-eslint": "^8.59.2",
+    "vite": "^8.0.12",
+    "vitest": "^4.1.6",
+    "wrangler": "^4.92.0"
+  }
+}

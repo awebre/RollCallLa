@@ -1,0 +1,25 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "worker",
+	"main": "./src/worker/index.ts",
+	"compatibility_date": "2026-05-17",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"observability": {
+		"enabled": true
+	},
+	"upload_source_maps": true,
+	"assets": {
+		"directory": "./dist/client",
+		"not_found_handling": "single-page-application"
+	},
+	"d1_databases": [
+		{
+			"binding": "la_vote_tracker",
+			"database_name": "la-vote-tracker",
+			"database_id": "df5605ce-f29a-4095-a39e-4420d83ec3e5",
+			"migrations_dir": "migrations"
+		}
+	]
+}
