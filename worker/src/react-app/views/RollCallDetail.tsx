@@ -33,7 +33,13 @@ export function RollCallDetail({ id }: { id: number }) {
     return (
         <>
             <p style={{ marginTop: 0 }}>
-                <a href={`javascript:history.back()`} style={{ color: '#666' }}>← back</a>
+                <button
+                    type="button"
+                    onClick={() => history.back()}
+                    style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: 0, font: 'inherit' }}
+                >
+                    ← back
+                </button>
             </p>
             <h2 style={{ marginBottom: 0, fontSize: '1.4rem' }}>
                 {head.bill_number}: {head.description}
