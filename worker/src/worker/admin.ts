@@ -7,7 +7,7 @@ import {
 } from '@simplewebauthn/server';
 import type { RegistrationResponseJSON, AuthenticationResponseJSON } from '@simplewebauthn/types';
 
-type AdminEnv = Env & { SESSION_SECRET: string; RP_ID?: string };
+type AdminEnv = Env;
 
 export const admin = new Hono<{ Bindings: AdminEnv }>();
 
@@ -251,7 +251,7 @@ admin.get('/me', async (c) => {
     return c.json({ authenticated, credential_exists: credentialExists });
 });
 
-admin.post('/logout', (c) => {
+admin.post('/logout', () => {
     return new Response(JSON.stringify({ ok: true }), {
         headers: {
             'Content-Type': 'application/json',

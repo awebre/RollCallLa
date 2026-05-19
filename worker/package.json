@@ -31,6 +31,7 @@
   "dependencies": {
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.0",
+    "@simplewebauthn/types": "^12.0.0",
     "hono": "^4.12.19",
     "maplibre-gl": "^5.24.0",
     "pdf-parse": "^2.4.5",
