@@ -39,11 +39,11 @@ export function TruncatedText({
       onMouseLeave={() => setOpen(false)}
     >
       {href ? (
-        <Link href={href} className="min-w-0 text-(--app-link)" title={text}>
+        <Link href={href} className="min-w-0 text-(--app-link)">
           <span className={previewClass}>{text}</span>
         </Link>
       ) : (
-        <span className={previewClass} title={text}>
+        <span className={previewClass}>
           {text}
         </span>
       )}
