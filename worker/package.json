@@ -21,7 +21,7 @@
     "build:districts": "node scripts/build-districts.mjs && npm run setup:local:geo",
     "build:zip-districts": "node scripts/build-zip-districts.mjs && npm run setup:local:geo",
     "upload:geo": "node scripts/upload-geo.mjs",
-    "setup:local:geo": "node scripts/upload-geo.mjs --vintage 2022 --local",
+    "setup:local:geo": "node scripts/upload-geo.mjs --local",
     "scrape:rosters": "node scripts/scrape-rosters.mjs /tmp/rosters.sql && wrangler d1 execute la_vote_tracker --local --file /tmp/rosters.sql",
     "scrape:bills": "node --experimental-strip-types scripts/scrape-bills.mjs",
     "scrape:terms": "node scripts/scrape-term-dates.mjs && wrangler d1 execute la_vote_tracker --local --file /tmp/term_dates.sql",

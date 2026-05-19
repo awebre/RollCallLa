@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Produces worker/src/react-app/data/zip-districts.json from:
+// Produces worker/geo/2022/zip-districts.json from:
 //   - Census TIGER ZCTA polygons (REST API, cached under .build-cache/zcta/)
-//   - Existing district GeoJSON files (src/react-app/data/)
+//   - Existing district GeoJSON files (geo/2022/)
 //
 // Each key in the output is a 5-digit ZIP code string. Each value:
 //   {
@@ -25,7 +25,7 @@ import mapshaper from 'mapshaper';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const CACHE_DIR = join(ROOT, '.build-cache', 'zcta');
-const DATA_DIR = join(ROOT, 'src', 'react-app', 'data');
+const DATA_DIR = join(ROOT, 'geo', '2022');
 
 // TIGER REST service for ZCTA5 — layer 1 of PUMA_TAD_TAZ_UGA_ZCTA
 // (layer 2 was ZCTA in earlier versions of the service; layer 1 is "2020 Census ZCTA")
@@ -178,10 +178,10 @@ const simplified = JSON.parse(simplifiedRaw['output.geojson'].toString());
 console.log(`  ${simplified.features.length} features after simplification`);
 
 const houseFeats = JSON.parse(
-    readFileSync(join(DATA_DIR, 'districts-house.json'), 'utf8'),
+    readFileSync(join(DATA_DIR, 'house.json'), 'utf8'),
 ).features;
 const senateFeats = JSON.parse(
-    readFileSync(join(DATA_DIR, 'districts-senate.json'), 'utf8'),
+    readFileSync(join(DATA_DIR, 'senate.json'), 'utf8'),
 ).features;
 
 // Pre-compute per-district bboxes for fast filtering
@@ -231,10 +231,11 @@ for (const feat of simplified.features) {
 }
 
 const outPath = join(DATA_DIR, 'zip-districts.json');
+
 const json = JSON.stringify(zipMap);
 writeFileSync(outPath, json);
 const sizekb = (Buffer.byteLength(json) / 1024).toFixed(0);
 console.log(
     `\nWrote ${outPath} (${sizekb} KB, ${Object.keys(zipMap).length} zip codes)`,
 );
-console.log('Commit worker/src/react-app/data/zip-districts.json when ready.');
+console.log('Commit worker/geo/2022/zip-districts.json when ready.');
