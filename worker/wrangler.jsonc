@@ -35,6 +35,6 @@
 		}
 	],
 	"vars": {
-		"FEEDBACK_FROM_EMAIL": "feedback@YOUR_DOMAIN"
+		"FEEDBACK_FROM_EMAIL": "feedback@thewebre.com"
 	}
 }
