@@ -98,9 +98,8 @@ for (const src of SOURCES) {
     //  - rename SLDLST/SLDUST -> district
     //  - cast "001"/"105" string codes to integers (matches legislators.district)
     //  - drop TIGER's "ZZZ" unassigned-area feature (water / not in any district)
-    //  - Visvalingam simplification at 4% with keep-shapes (no polygon collapse)
     //  - clean slivers + topology errors
-    //  - round coordinates to ~1.1 m precision (huge size win, unnoticeable on the map)
+    //  - full coordinate precision (district boundaries are politically significant)
     await run('npx', [
         '--yes',
         'mapshaper',
@@ -111,7 +110,7 @@ for (const src of SOURCES) {
         '-each', 'district = +district',
         '-filter', 'district > 0',
         '-clean',
-        '-o', `format=geojson`, `precision=0.00001`, outPath,
+        '-o', `format=geojson`, outPath,
     ]);
 
     // Verify
