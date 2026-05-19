@@ -32,6 +32,13 @@ type FC = {
   }[];
 };
 
+type ZipEntry = {
+  bbox: [[number, number], [number, number]];
+  polygon: { type: string; coordinates: number[][][] | number[][][][] };
+  H: number[];
+  S: number[];
+};
+
 // Imported through Vite's module graph (not public/), so the JSON files are
 // served by Vite in dev — bypassing the Cloudflare Vite plugin's asset router,
 // which doesn't pick up files added to public/ after startup. In prod, Vite
@@ -46,6 +53,12 @@ function loadDistricts(chamber: Chamber): Promise<FC> {
       );
 }
 
+function loadZipDistricts(): Promise<Record<string, ZipEntry>> {
+  return import("../data/zip-districts.json").then(
+    (m) => m.default as unknown as Record<string, ZipEntry>,
+  );
+}
+
 export function DistrictMap() {
   const { current: currentSession } = useSession();
   const sessionId = currentSession?.session_id ?? null;
@@ -54,6 +67,13 @@ export function DistrictMap() {
   const [selectedDistrict, setSelectedDistrict] = useState<number | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
+
+  // Zip code lookup state
+  const [zipInput, setZipInput] = useState("");
+  const [activeZip, setActiveZip] = useState<string | null>(null);
+  const [zipError, setZipError] = useState<string | null>(null);
+  const activeZipRef = useRef<string | null>(null);
+  const zipDataRef = useRef<Record<string, ZipEntry> | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   // Stored as `any` to avoid a hard import of maplibre-gl types from this module —
@@ -64,32 +84,27 @@ export function DistrictMap() {
   const mlRef = useRef<any>(null);
   const prevSelectedRef = useRef<number | null>(null);
   const geoRef = useRef<FC | null>(null);
-  // The map-click handler is registered inside the layer-setup effect, which only
-  // re-runs on chamber change. To let it read the *current* selection (for the
-  // "click again to zoom" behavior) without recreating the listener every render,
-  // we keep selection in a ref synchronized to React state.
   const selectedDistrictRef = useRef<number | null>(null);
+  // ID of the first basemap symbol layer — used to insert overlays below labels.
+  const firstLabelLayerRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
-    // With a session selected, ask for "everyone who voted in that session"
-    // (covers special-election successors + synthetic PDF-only rows).
-    // Without one, fall back to the currently-serving roster.
     const url = sessionId
       ? `/api/legislators?session_id=${sessionId}`
       : "/api/legislators?active=1";
     fetch(url)
       .then((r) => r.json() as Promise<{ legislators: Legislator[] }>)
       .then((d) => setLegislators(d.legislators))
-      .catch(() => {
-        // Non-fatal — map still works for browsing; the side panel will show "Seat vacant" everywhere.
-      });
+      .catch(() => {});
   }, [sessionId]);
 
-  // Index by (role, district). A single district may have multiple holders in
-  // one session (resignations, mid-term deaths, special elections), so the
-  // value is a list rather than a single legislator. Each list is sorted with
-  // the most recent term-start first — that's the row used for the polygon's
-  // party color; the rest show below in the side panel.
+  // Load zip-districts.json lazily in the background once component mounts.
+  useEffect(() => {
+    loadZipDistricts().then((data) => {
+      zipDataRef.current = data;
+    });
+  }, []);
+
   const byKey = useMemo(() => {
     const m = new Map<string, Legislator[]>();
     for (const l of legislators) {
@@ -119,15 +134,11 @@ export function DistrictMap() {
         if (cancelled || !containerRef.current) return;
         const map = new ml.Map({
           container: containerRef.current,
-          // OpenFreeMap "positron" — free public vector tiles, no API key,
-          // muted style designed as a backdrop for data overlays. Attribution
-          // (OpenStreetMap contributors) is required and shown by the default
-          // AttributionControl that ships with MapLibre.
           style: "https://tiles.openfreemap.org/styles/positron",
           center: [-91.96, 30.99],
           zoom: 5.9,
           minZoom: 5.5,
-          maxZoom: 13,
+          maxZoom: 18,
           maxBounds: [
             [-95.5, 28.0],
             [-87.5, 34.0],
@@ -144,6 +155,10 @@ export function DistrictMap() {
           if (cancelled) return;
           mapRef.current = map;
           mlRef.current = ml;
+          const styleLayers = map.getStyle().layers ?? [];
+          firstLabelLayerRef.current = styleLayers.find(
+            (l: { type?: string; id: string }) => l.type === "symbol",
+          )?.id;
           setMapReady(true);
         });
       } catch (err) {
@@ -163,8 +178,6 @@ export function DistrictMap() {
     };
   }, []);
 
-  // (Re)load district polygons whenever chamber changes — and when the legislator
-  // index changes, so vacant-district shading updates if the roster loads after the map.
   useEffect(() => {
     const map = mapRef.current;
     if (!mapReady || !map) return;
@@ -187,12 +200,7 @@ export function DistrictMap() {
         promoteId: "district",
       });
 
-      // Insert district layers just below the basemap's first symbol (label)
-      // layer so place names, road shields, and POI labels stay readable on top.
-      const styleLayers = map.getStyle().layers ?? [];
-      const firstLabelLayerId = styleLayers.find(
-        (l: { type?: string; id: string }) => l.type === "symbol",
-      )?.id;
+      const firstLabelLayerId = firstLabelLayerRef.current;
 
       map.addLayer(
         {
@@ -200,9 +208,6 @@ export function DistrictMap() {
           type: "fill",
           source: "districts",
           paint: {
-            // Polygon fill colors the district by the party of the seat-holder.
-            // Vacant seats override any party value. Opacity rises on hover/select
-            // so the political shading remains visible across all interaction states.
             "fill-color": [
               "case",
               ["boolean", ["feature-state", "vacant"], false],
@@ -216,7 +221,7 @@ export function DistrictMap() {
                 "#dc2626",
                 "I",
                 "#737373",
-                /* default */ "#9ca3af",
+                "#9ca3af",
               ],
             ],
             "fill-opacity": [
@@ -225,6 +230,8 @@ export function DistrictMap() {
               0.65,
               ["boolean", ["feature-state", "hover"], false],
               0.45,
+              ["boolean", ["feature-state", "dimmed"], false],
+              0.07,
               ["boolean", ["feature-state", "vacant"], false],
               0.22,
               0.28,
@@ -242,7 +249,12 @@ export function DistrictMap() {
           paint: {
             "line-color": "#1e40af",
             "line-width": 0.7,
-            "line-opacity": 0.45,
+            "line-opacity": [
+              "case",
+              ["boolean", ["feature-state", "dimmed"], false],
+              0.1,
+              0.45,
+            ],
           },
         },
         firstLabelLayerId,
@@ -266,10 +278,6 @@ export function DistrictMap() {
         firstLabelLayerId,
       );
 
-      // Stamp vacant + party feature-state up-front so the political shading
-      // and gray vacant fill are correct on first paint, before any hover/click.
-      // For districts with multiple holders this session, the most recent
-      // holder (first in the sorted list) drives the polygon color.
       for (const feat of data.features) {
         const d = feat.properties.district;
         const list = byKey.get(`${ROLE[chamber]}-${d}`);
@@ -280,10 +288,38 @@ export function DistrictMap() {
         );
       }
 
+      // If a zip was active when the chamber changed, re-apply dimming for
+      // the new chamber's districts and re-stack the zip outline above them.
+      if (activeZipRef.current && zipDataRef.current) {
+        const entry = zipDataRef.current[activeZipRef.current];
+        if (entry) applyZipFilter(entry, chamber);
+      }
+
       let hoveredId: number | null = null;
       const onMove = (e: { features?: Array<{ id: number }> }) => {
         if (!e.features?.length) return;
         const id = e.features[0].id as number;
+
+        // In zip mode, ignore hover for districts not matching the active zip
+        const zip = activeZipRef.current;
+        if (zip !== null && zipDataRef.current) {
+          const entry = zipDataRef.current[zip];
+          if (entry) {
+            const matched = chamber === "H" ? entry.H : entry.S;
+            if (!matched.includes(id)) {
+              if (hoveredId !== null && hoveredId !== id) {
+                map.setFeatureState(
+                  { source: "districts", id: hoveredId },
+                  { hover: false },
+                );
+                hoveredId = null;
+              }
+              map.getCanvas().style.cursor = "";
+              return;
+            }
+          }
+        }
+
         if (hoveredId !== null && hoveredId !== id) {
           map.setFeatureState(
             { source: "districts", id: hoveredId },
@@ -309,8 +345,17 @@ export function DistrictMap() {
       }) => {
         if (!e.features?.length) return;
         const d = e.features[0].properties.district;
-        // First click on a polygon just selects it (panel updates, no camera move).
-        // Clicking the already-selected polygon a second time zooms to its bounds.
+
+        // In zip mode, ignore clicks on non-matching districts
+        const zip = activeZipRef.current;
+        if (zip !== null && zipDataRef.current) {
+          const entry = zipDataRef.current[zip];
+          if (entry) {
+            const matched = chamber === "H" ? entry.H : entry.S;
+            if (!matched.includes(d)) return;
+          }
+        }
+
         if (selectedDistrictRef.current === d) {
           zoomToDistrict(d);
         } else {
@@ -330,15 +375,15 @@ export function DistrictMap() {
     setSelectedDistrict(null);
   }, [chamber]);
 
-  // Keep the selected-district ref in sync with state so map-click handlers
-  // (registered once per chamber) see the current selection.
   useEffect(() => {
     selectedDistrictRef.current = selectedDistrict;
   }, [selectedDistrict]);
 
-  // Sync map highlight with the selected district. Camera moves (fitBounds)
-  // are handled separately by zoomToDistrict() — invoked on second-click of
-  // an already-selected polygon or when the user picks from the dropdown.
+  // Keep activeZipRef in sync so map-click handlers see current value
+  useEffect(() => {
+    activeZipRef.current = activeZip;
+  }, [activeZip]);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!mapReady || !map || !map.getSource("districts")) return;
@@ -370,10 +415,99 @@ export function DistrictMap() {
     if (b) map.fitBounds(b, { padding: 60, duration: 600, maxZoom: 11 });
   }
 
+  function applyZipFilter(entry: ZipEntry, chamberKey: Chamber) {
+    const map = mapRef.current;
+    if (!map || !geoRef.current) return;
+    const matched = chamberKey === "H" ? entry.H : entry.S;
+
+    // Dim districts not in this zip; fully show matching ones.
+    for (const feat of geoRef.current.features) {
+      const d = feat.properties.district;
+      map.setFeatureState(
+        { source: "districts", id: d },
+        { dimmed: !matched.includes(d) },
+      );
+    }
+
+    // Draw the zip boundary as a highlighted outline.
+    const fc = {
+      type: "FeatureCollection",
+      features: [{ type: "Feature", geometry: entry.polygon, properties: {} }],
+    };
+    if (map.getSource("zip-outline")) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (map.getSource("zip-outline") as any).setData(fc);
+      // Keep outline above any freshly-re-added district layers.
+      if (map.getLayer("zip-outline-line"))
+        map.moveLayer("zip-outline-line", firstLabelLayerRef.current);
+    } else {
+      map.addSource("zip-outline", { type: "geojson", data: fc });
+      map.addLayer(
+        {
+          id: "zip-outline-line",
+          type: "line",
+          source: "zip-outline",
+          paint: { "line-color": "#ffffff", "line-width": 2.5 },
+        },
+        firstLabelLayerRef.current,
+      );
+    }
+  }
+
+  function removeZipFilter() {
+    const map = mapRef.current;
+    if (!map) return;
+    if (geoRef.current) {
+      for (const feat of geoRef.current.features) {
+        map.setFeatureState(
+          { source: "districts", id: feat.properties.district },
+          { dimmed: false },
+        );
+      }
+    }
+    if (map.getLayer("zip-outline-line")) map.removeLayer("zip-outline-line");
+    if (map.getSource("zip-outline")) map.removeSource("zip-outline");
+  }
+
+  function handleZipSubmit(zip: string) {
+    if (zip.length !== 5) return;
+    const data = zipDataRef.current;
+    if (!data) {
+      setZipError("Zip data loading, try again in a moment.");
+      return;
+    }
+    const entry = data[zip];
+    if (!entry) {
+      setZipError(`${zip} not found in Louisiana.`);
+      return;
+    }
+    setZipError(null);
+    setActiveZip(zip);
+    const map = mapRef.current;
+    if (map) map.fitBounds(entry.bbox, { padding: 60, duration: 600 });
+    applyZipFilter(entry, chamber);
+  }
+
+  function handleZipClear() {
+    setZipInput("");
+    setActiveZip(null);
+    setZipError(null);
+    removeZipFilter();
+    // selectedDistrict is intentionally preserved per spec
+  }
+
   const selectedList: Legislator[] =
     selectedDistrict !== null
       ? (byKey.get(`${ROLE[chamber]}-${selectedDistrict}`) ?? [])
       : [];
+
+  const activeZipEntry =
+    activeZip !== null ? zipDataRef.current?.[activeZip] : null;
+  const zipMatchedDistricts = activeZipEntry
+    ? chamber === "H"
+      ? activeZipEntry.H
+      : activeZipEntry.S
+    : null;
 
   return (
     <>
@@ -426,9 +560,6 @@ export function DistrictMap() {
             onChange={(e) => {
               const v = e.target.value ? Number(e.target.value) : null;
               setSelectedDistrict(v);
-              // Dropdown is an explicit "take me there" gesture — zoom in
-              // so the picked district is centered, unlike the map-click
-              // path which keeps the camera still on the first click.
               if (v !== null) zoomToDistrict(v);
             }}
             className="border border-(--app-border-input) bg-(--bg) px-2 py-2 text-base text-(--app-ink)"
@@ -436,6 +567,10 @@ export function DistrictMap() {
             <option value="">— pick a district —</option>
             {Array.from({ length: COUNT[chamber] }, (_, i) => i + 1).map(
               (n) => {
+                const inZip =
+                  zipMatchedDistricts !== null
+                    ? zipMatchedDistricts.includes(n)
+                    : true;
                 const list = byKey.get(`${ROLE[chamber]}-${n}`) ?? [];
                 const primary = list[0];
                 const extra = list.length - 1;
@@ -443,13 +578,60 @@ export function DistrictMap() {
                   ? `${formatName(primary)} (${primary.party ?? "—"})${extra > 0 ? ` + ${extra} other` : ""}`
                   : "vacant";
                 return (
-                  <option key={n} value={n}>
-                    District {n} — {label}
+                  <option key={n} value={n} disabled={!inZip}>
+                    {inZip ? "" : "✕ "}District {n} — {label}
                   </option>
                 );
               },
             )}
           </select>
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className="px-1 font-mono text-[0.75rem] tracking-[1.5px] text-(--app-subtitle) uppercase">
+            Zip code
+            {activeZip && zipMatchedDistricts !== null && (
+              <span className="ml-2 normal-case tracking-normal font-sans font-normal text-(--app-text-muted)">
+                · {zipMatchedDistricts.length} district
+                {zipMatchedDistricts.length === 1 ? "" : "s"}
+              </span>
+            )}
+          </span>
+          <div className="flex items-center gap-1">
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={5}
+              placeholder="70112"
+              value={zipInput}
+              onChange={(e) => {
+                const v = e.target.value.replace(/\D/g, "").slice(0, 5);
+                setZipInput(v);
+                if (v.length === 5) handleZipSubmit(v);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleZipSubmit(zipInput);
+                if (e.key === "Escape") handleZipClear();
+              }}
+              className="w-24 border border-(--app-border-input) bg-(--bg) px-2 py-2 font-mono text-base text-(--app-ink)"
+              aria-label="Filter by zip code"
+            />
+            {activeZip && (
+              <button
+                type="button"
+                onClick={handleZipClear}
+                className="px-2 py-1.5 text-[1.1rem] leading-none text-(--app-text-muted) hover:text-(--app-ink)"
+                aria-label="Clear zip filter"
+              >
+                ×
+              </button>
+            )}
+          </div>
+          {zipError && (
+            <span className="px-1 text-[0.75rem] text-(--app-warn-text)">
+              {zipError}
+            </span>
+          )}
         </label>
 
         <div
@@ -470,7 +652,9 @@ export function DistrictMap() {
       >
         {selectedDistrict === null ? (
           <p className="m-0 text-(--app-text-muted)">
-            Click a district or pick one above.
+            {activeZip && zipMatchedDistricts !== null
+              ? `Zip ${activeZip} spans ${zipMatchedDistricts.length} ${chamber === "H" ? "House" : "Senate"} district${zipMatchedDistricts.length === 1 ? "" : "s"}. Click one to see the member.`
+              : "Click a district or pick one above."}
           </p>
         ) : (
           <>
@@ -495,7 +679,7 @@ export function DistrictMap() {
                   {selectedList.map((l, i) => (
                     <li
                       key={l.people_id}
-                      className={`py-[0.6rem] ${i === 0 ? '' : 'border-t border-(--app-border-warm)'}`}
+                      className={`py-[0.6rem] ${i === 0 ? "" : "border-t border-(--app-border-warm)"}`}
                     >
                       <HolderRow leg={l} compact />
                     </li>
@@ -519,8 +703,6 @@ export function DistrictMap() {
   );
 }
 
-// Compute bounding box [[minLng, minLat], [maxLng, maxLat]] for a GeoJSON Polygon/MultiPolygon.
-// Inline rather than pulling in turf, since this is the only geometry computation we do.
 function bboxOf(geom: unknown): [[number, number], [number, number]] | null {
   const g = geom as { type: string; coordinates: unknown };
   if (!g || typeof g !== "object") return null;
@@ -606,11 +788,11 @@ function LegendSwatch({ color, label }: { color: string; label: string }) {
 }
 
 function chamberToggleBtnClass(active: boolean): string {
-  return `inline-flex items-center gap-[0.4rem] rounded-[6px] border-none px-[1.1rem] py-[0.55rem] text-base font-inherit transition-[background,color] duration-120 ease-in ${active ? 'cursor-default bg-(--app-navy-active-bg) text-(--app-navy-active-text) font-bold' : 'cursor-pointer bg-transparent text-(--app-navy-inactive-text) font-medium'}`;
+  return `inline-flex items-center gap-[0.4rem] rounded-[6px] border-none px-[1.1rem] py-[0.55rem] text-base font-inherit transition-[background,color] duration-120 ease-in ${active ? "cursor-default bg-(--app-navy-active-bg) text-(--app-navy-active-text) font-bold" : "cursor-pointer bg-transparent text-(--app-navy-inactive-text) font-medium"}`;
 }
 
 function chamberCountClass(active: boolean): string {
-  return `rounded px-1.5 py-px font-mono text-[0.7rem] font-semibold ${active ? 'bg-(--app-navy-count-active-bg) text-(--app-navy-active-text)' : 'bg-(--app-navy-count-bg) text-(--app-navy-count-text)'}`;
+  return `rounded px-1.5 py-px font-mono text-[0.7rem] font-semibold ${active ? "bg-(--app-navy-count-active-bg) text-(--app-navy-active-text)" : "bg-(--app-navy-count-bg) text-(--app-navy-count-text)"}`;
 }
 
 const mapErrorStyle: CSSProperties = {

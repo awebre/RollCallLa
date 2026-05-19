@@ -168,6 +168,7 @@ export function LegislatorDetail({ id }: { id: number }) {
               <th className="px-1 py-2">Cast</th>
               <th className="px-1 py-2">Tally</th>
               <th className="px-1 py-2">Result</th>
+              <th className="px-1 py-2">PDF</th>
             </tr>
           </thead>
           <tbody>
@@ -223,6 +224,18 @@ export function LegislatorDetail({ id }: { id: number }) {
                   className={`px-1 py-[0.4rem] ${resultColorClass(Boolean(v.passed))}`}
                 >
                   {v.passed ? "Passed" : "Failed"}
+                </td>
+                <td className="px-1 py-[0.4rem] whitespace-nowrap">
+                  {v.pdf_doc_id != null ? (
+                    <a
+                      href={`https://legis.la.gov/legis/ViewDocument.aspx?d=${v.pdf_doc_id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-(--app-link-ext)"
+                    >
+                      PDF ↗
+                    </a>
+                  ) : null}
                 </td>
               </tr>
             ))}

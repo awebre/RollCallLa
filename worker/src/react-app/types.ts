@@ -29,6 +29,7 @@ export type LegislatorVoteRow = {
     bill_number: string;
     title: string | null;
     cast_vote: 1 | 2 | 3 | 4;
+    pdf_doc_id: number | null;
 };
 
 export type RollCallMember = {

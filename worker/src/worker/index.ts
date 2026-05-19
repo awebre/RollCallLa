@@ -257,6 +257,7 @@ app.get('/api/legislators/:id/votes', async (c) => {
         SELECT
             rc.roll_call_id, rc.date, rc.chamber, rc.description, rc.vote_category,
             rc.yea, rc.nay, rc.nv, rc.absent, rc.total, rc.passed, rc.margin,
+            rc.pdf_doc_id,
             b.bill_id, b.bill_number, b.title,
             v.vote AS cast_vote
         FROM votes v
