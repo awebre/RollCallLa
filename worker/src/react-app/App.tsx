@@ -5,7 +5,9 @@ import { RollCallDetail } from './views/RollCallDetail';
 import { DistrictMap } from './views/Map';
 import { Status } from './components/Status';
 import { SessionPicker } from './components/SessionPicker';
-import { SessionProvider } from './SessionContext';
+import { SessionProvider, useSession } from './SessionContext';
+
+const GEO_BASE = import.meta.env.VITE_GEO_BASE_URL ?? '/geo';
 
 // Tiny hash router so we avoid a routing dependency for v1.
 // Paths: '/', '/map', '/legislator/<id>', '/rollcall/<id>'
@@ -25,10 +27,23 @@ function useHashRoute(): { path: string; param: string | null } {
     return { path: 'roster', param: null };
 }
 
+function GeoPrefetch() {
+    const { current } = useSession();
+    useEffect(() => {
+        const v = current?.map_vintage;
+        if (!v) return;
+        fetch(`${GEO_BASE}/${v}/house.json`);
+        fetch(`${GEO_BASE}/${v}/senate.json`);
+        fetch(`${GEO_BASE}/${v}/zip-districts.json`);
+    }, [current?.map_vintage]);
+    return null;
+}
+
 function App() {
     const { path, param } = useHashRoute();
     return (
         <SessionProvider>
+            <GeoPrefetch />
             <main className="box-border mx-auto w-full max-w-260 px-4 pt-8 pb-16 font-serif text-(--app-ink)">
                 <header className="mb-3 border-b-2 border-(--app-ink) pb-2">
                     <div className="flex flex-wrap items-end justify-between gap-4">

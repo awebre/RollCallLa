@@ -21,5 +21,11 @@
 			"database_id": "df5605ce-f29a-4095-a39e-4420d83ec3e5",
 			"migrations_dir": "migrations"
 		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "GEO_ASSETS",
+			"bucket_name": "roll-call-la-geo"
+		}
 	]
 }

@@ -1,0 +1,1 @@
+ALTER TABLE sessions ADD COLUMN map_vintage TEXT NOT NULL DEFAULT '2022';

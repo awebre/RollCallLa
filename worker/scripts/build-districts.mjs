@@ -6,12 +6,9 @@
 // sessions. The 2022 maps (Acts 1 & 5) remain in force; Nairne v. Landry
 // is stayed pending Louisiana v. Callais. Revisit after Callais drops.
 //
-// Output goes into the React app's source tree so Vite can import the files
-// as ES modules and code-split them. The Cloudflare Vite plugin's dev
-// middleware doesn't pick up new files added under public/ at runtime, so we
-// route around it by importing through the module graph instead.
-//   worker/src/react-app/data/districts-house.json   (~105 features, ~200-300 KB)
-//   worker/src/react-app/data/districts-senate.json  (~39  features, ~100-200 KB)
+// Output goes into geo/{vintage}/ and is served from R2 in production.
+//   worker/geo/2022/house.json    (~105 features)
+//   worker/geo/2022/senate.json   (~39  features)
 //
 // Properties on each feature are normalized to:
 //   { district: <integer> }    // joins with legislators.district on (role, district)
@@ -30,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 const CACHE_DIR = join(ROOT, '.build-cache', 'districts');
-const DATA_DIR = join(ROOT, 'src', 'react-app', 'data');
+const DATA_DIR = join(ROOT, 'geo', '2022');
 
 const TIGER_YEAR = 2024;
 const STATE_FIPS = '22'; // Louisiana
@@ -42,7 +39,7 @@ const SOURCES = [
         url: `https://www2.census.gov/geo/tiger/TIGER${TIGER_YEAR}/SLDL/tl_${TIGER_YEAR}_${STATE_FIPS}_sldl.zip`,
         zipName: `tl_${TIGER_YEAR}_${STATE_FIPS}_sldl.zip`,
         districtField: 'SLDLST',
-        output: 'districts-house.json',
+        output: 'house.json',
         expectedCount: 105,
     },
     {
@@ -51,7 +48,7 @@ const SOURCES = [
         url: `https://www2.census.gov/geo/tiger/TIGER${TIGER_YEAR}/SLDU/tl_${TIGER_YEAR}_${STATE_FIPS}_sldu.zip`,
         zipName: `tl_${TIGER_YEAR}_${STATE_FIPS}_sldu.zip`,
         districtField: 'SLDUST',
-        output: 'districts-senate.json',
+        output: 'senate.json',
         expectedCount: 39,
     },
 ];
@@ -98,9 +95,8 @@ for (const src of SOURCES) {
     //  - rename SLDLST/SLDUST -> district
     //  - cast "001"/"105" string codes to integers (matches legislators.district)
     //  - drop TIGER's "ZZZ" unassigned-area feature (water / not in any district)
-    //  - Visvalingam simplification at 4% with keep-shapes (no polygon collapse)
     //  - clean slivers + topology errors
-    //  - round coordinates to ~1.1 m precision (huge size win, unnoticeable on the map)
+    //  - full coordinate precision (district boundaries are politically significant)
     await run('npx', [
         '--yes',
         'mapshaper',
@@ -110,9 +106,8 @@ for (const src of SOURCES) {
         '-rename-fields', `district=${src.districtField}`,
         '-each', 'district = +district',
         '-filter', 'district > 0',
-        '-simplify', 'visvalingam', '4%', 'keep-shapes',
         '-clean',
-        '-o', `format=geojson`, `precision=0.00001`, outPath,
+        '-o', `format=geojson`, outPath,
     ]);
 
     // Verify
@@ -136,4 +131,4 @@ for (const src of SOURCES) {
     }
 }
 
-console.log('\nDone. GeoJSON written to worker/src/react-app/data/. Commit these files.');
+console.log('\nDone. GeoJSON written to worker/geo/2022/. Commit these files.');

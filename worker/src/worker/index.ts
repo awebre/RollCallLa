@@ -9,10 +9,22 @@ const CACHE = 'public, max-age=600';
 
 app.get('/api/', (c) => c.json({ name: 'Cloudflare' }));
 
+const GEO_FILES = new Set(['house.json', 'senate.json', 'zip-districts.json']);
+
+app.get('/geo/:vintage/:file', async (c) => {
+    const { vintage, file } = c.req.param();
+    if (!GEO_FILES.has(file)) return c.notFound();
+    const obj = await c.env.GEO_ASSETS.get(`${vintage}/${file}`);
+    if (!obj) return c.notFound();
+    c.header('Content-Type', 'application/json');
+    c.header('Cache-Control', 'public, max-age=31536000, immutable');
+    return c.body(obj.body);
+});
+
 app.get('/api/sessions', async (c) => {
     const db = c.env.la_vote_tracker;
     const { results } = await db.prepare(
-        `SELECT session_id, name, year_start, year_end, special FROM sessions ORDER BY year_start DESC, session_id DESC`,
+        `SELECT session_id, name, year_start, year_end, special, map_vintage FROM sessions ORDER BY year_start DESC, session_id DESC`,
     ).all();
     c.header('cache-control', CACHE);
     return c.json({ sessions: results });
@@ -257,6 +269,7 @@ app.get('/api/legislators/:id/votes', async (c) => {
         SELECT
             rc.roll_call_id, rc.date, rc.chamber, rc.description, rc.vote_category,
             rc.yea, rc.nay, rc.nv, rc.absent, rc.total, rc.passed, rc.margin,
+            rc.pdf_doc_id,
             b.bill_id, b.bill_number, b.title,
             v.vote AS cast_vote
         FROM votes v

@@ -8,7 +8,7 @@ const builder = await createBuilder();
 const worker = await builder
     // CommunityToolkit.Aspire.Hosting.NodeJS.Extensions has no TS bindings yet;
     // addExecutable + sh is the current workaround for npm-based dev servers.
-    .addExecutable('roll-call-la', 'sh', '../worker', ['-c', 'npm install && npm run dev -- --host --strictPort'])
+    .addExecutable('roll-call-la', 'sh', '../worker', ['-c', 'npm install && npm run setup:local:geo && npm run dev -- --host --strictPort'])
     .withHttpEndpoint({ targetPort: 5173, isProxied: false });
 
 await builder
