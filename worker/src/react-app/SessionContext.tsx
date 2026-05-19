@@ -6,6 +6,7 @@ export type SessionRow = {
     year_start: number;
     year_end: number;
     special: number;
+    map_vintage: string;
 };
 
 type Ctx = {

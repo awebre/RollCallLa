@@ -39,29 +39,21 @@ type ZipEntry = {
   S: number[];
 };
 
-// Imported through Vite's module graph (not public/), so the JSON files are
-// served by Vite in dev — bypassing the Cloudflare Vite plugin's asset router,
-// which doesn't pick up files added to public/ after startup. In prod, Vite
-// emits each JSON as a separate chunk loaded only when /map is visited.
-function loadDistricts(chamber: Chamber): Promise<FC> {
-  return chamber === "H"
-    ? import("../data/districts-house.json").then(
-        (m) => m.default as unknown as FC,
-      )
-    : import("../data/districts-senate.json").then(
-        (m) => m.default as unknown as FC,
-      );
+function loadDistricts(chamber: Chamber, vintage: string): Promise<FC> {
+  const file = chamber === "H" ? "house.json" : "senate.json";
+  return fetch(`/geo/${vintage}/${file}`).then((r) => r.json() as Promise<FC>);
 }
 
-function loadZipDistricts(): Promise<Record<string, ZipEntry>> {
-  return import("../data/zip-districts.json").then(
-    (m) => m.default as unknown as Record<string, ZipEntry>,
+function loadZipDistricts(vintage: string): Promise<Record<string, ZipEntry>> {
+  return fetch(`/geo/${vintage}/zip-districts.json`).then(
+    (r) => r.json() as Promise<Record<string, ZipEntry>>,
   );
 }
 
 export function DistrictMap() {
   const { current: currentSession } = useSession();
   const sessionId = currentSession?.session_id ?? null;
+  const vintage = currentSession?.map_vintage ?? "2022";
   const [chamber, setChamber] = useState<Chamber>("H");
   const [legislators, setLegislators] = useState<Legislator[]>([]);
   const [selectedDistrict, setSelectedDistrict] = useState<number | null>(null);
@@ -98,12 +90,12 @@ export function DistrictMap() {
       .catch(() => {});
   }, [sessionId]);
 
-  // Load zip-districts.json lazily in the background once component mounts.
+  // Load zip-districts lazily in the background; reload if vintage changes.
   useEffect(() => {
-    loadZipDistricts().then((data) => {
+    loadZipDistricts(vintage).then((data) => {
       zipDataRef.current = data;
     });
-  }, []);
+  }, [vintage]);
 
   const byKey = useMemo(() => {
     const m = new Map<string, Legislator[]>();
@@ -183,7 +175,7 @@ export function DistrictMap() {
     if (!mapReady || !map) return;
     let cancelled = false;
     (async () => {
-      const data = await loadDistricts(chamber);
+      const data = await loadDistricts(chamber, vintage);
       if (cancelled || !mapRef.current) return;
       geoRef.current = data;
 
@@ -369,7 +361,7 @@ export function DistrictMap() {
     return () => {
       cancelled = true;
     };
-  }, [mapReady, chamber, byKey]);
+  }, [mapReady, chamber, byKey, vintage]);
 
   useEffect(() => {
     setSelectedDistrict(null);
