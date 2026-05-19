@@ -39,13 +39,15 @@ type ZipEntry = {
   S: number[];
 };
 
+const GEO_BASE = import.meta.env.VITE_GEO_BASE_URL ?? '/geo';
+
 function loadDistricts(chamber: Chamber, vintage: string): Promise<FC> {
   const file = chamber === "H" ? "house.json" : "senate.json";
-  return fetch(`/geo/${vintage}/${file}`).then((r) => r.json() as Promise<FC>);
+  return fetch(`${GEO_BASE}/${vintage}/${file}`).then((r) => r.json() as Promise<FC>);
 }
 
 function loadZipDistricts(vintage: string): Promise<Record<string, ZipEntry>> {
-  return fetch(`/geo/${vintage}/zip-districts.json`).then(
+  return fetch(`${GEO_BASE}/${vintage}/zip-districts.json`).then(
     (r) => r.json() as Promise<Record<string, ZipEntry>>,
   );
 }

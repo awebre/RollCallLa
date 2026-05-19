@@ -7,6 +7,8 @@ import { Status } from './components/Status';
 import { SessionPicker } from './components/SessionPicker';
 import { SessionProvider, useSession } from './SessionContext';
 
+const GEO_BASE = import.meta.env.VITE_GEO_BASE_URL ?? '/geo';
+
 // Tiny hash router so we avoid a routing dependency for v1.
 // Paths: '/', '/map', '/legislator/<id>', '/rollcall/<id>'
 function useHashRoute(): { path: string; param: string | null } {
@@ -30,9 +32,9 @@ function GeoPrefetch() {
     useEffect(() => {
         const v = current?.map_vintage;
         if (!v) return;
-        fetch(`/geo/${v}/house.json`);
-        fetch(`/geo/${v}/senate.json`);
-        fetch(`/geo/${v}/zip-districts.json`);
+        fetch(`${GEO_BASE}/${v}/house.json`);
+        fetch(`${GEO_BASE}/${v}/senate.json`);
+        fetch(`${GEO_BASE}/${v}/zip-districts.json`);
     }, [current?.map_vintage]);
     return null;
 }
