@@ -37,7 +37,7 @@ export function AdminView() {
 
     useEffect(() => {
         fetch('/api/admin/me')
-            .then((r) => r.json<{ authenticated: boolean; credential_exists: boolean }>())
+            .then((r) => r.json() as Promise<{ authenticated: boolean; credential_exists: boolean }>)
             .then((data) => {
                 if (data.authenticated) {
                     setState('dashboard');
@@ -54,7 +54,7 @@ export function AdminView() {
     async function loadFeedback(filter: string) {
         const qs = filter ? `?status=${filter}` : '';
         const data = await fetch(`/api/admin/feedback${qs}`).then((r) =>
-            r.json<{ feedback: FeedbackRow[] }>(),
+            r.json() as Promise<{ feedback: FeedbackRow[] }>,
         );
         setFeedback(data.feedback);
     }
