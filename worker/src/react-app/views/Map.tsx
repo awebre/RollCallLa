@@ -9,6 +9,7 @@ import type { Legislator } from "../types";
 import { formatName } from "../types";
 import { useSession } from "../SessionContext";
 import { partyColorClass } from "../style/color-classes";
+import { Link } from "wouter";
 
 // District boundaries are TIGER 2024 (post-2022 redistricting; Acts 1 & 5 of
 // 2022). They remain in force for the 2024–2026 sessions — Nairne v. Landry is
@@ -749,9 +750,9 @@ function HolderRow({
   return (
     <>
       <h3 className={compact ? "mb-[0.15rem] mt-0 text-[1.1rem]" : "mb-1 mt-2 text-[1.4rem]"}>
-        <a href={`#/legislator/${leg.people_id}`} className="text-(--app-link)">
+        <Link href={`/legislator/${leg.people_id}`} className="text-(--app-link)">
           {formatName(leg)}
-        </a>
+        </Link>
       </h3>
       <div
         className={`${partyColorClass(leg.party)} font-semibold ${compact ? "text-[0.9rem]" : "text-base"}`}
@@ -765,9 +766,9 @@ function HolderRow({
         </div>
       )}
       {!compact && (
-        <a href={`#/legislator/${leg.people_id}`} className="mt-3 inline-block text-(--app-link-navy)">
+        <Link href={`/legislator/${leg.people_id}`} className="mt-3 inline-block text-(--app-link-navy)">
           See voting record →
-        </a>
+        </Link>
       )}
     </>
   );

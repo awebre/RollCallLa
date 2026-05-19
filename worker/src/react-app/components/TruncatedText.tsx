@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
+import { Link } from "wouter";
 
 type TruncatedTextProps = {
   text: string;
@@ -38,9 +39,9 @@ export function TruncatedText({
       onMouseLeave={() => setOpen(false)}
     >
       {href ? (
-        <a href={href} className="min-w-0 text-(--app-link)" title={text}>
+        <Link href={href} className="min-w-0 text-(--app-link)" title={text}>
           <span className={previewClass}>{text}</span>
-        </a>
+        </Link>
       ) : (
         <span className={previewClass} title={text}>
           {text}

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Legislator, LegislatorVoteRow } from "../types";
 import { formatName, VOTE_LABEL } from "../types";
 import { useSession } from "../SessionContext";
+import { Link } from "wouter";
 import { ProvenanceBadge } from "../components/ProvenanceBadge";
 import { TruncatedText } from "../components/TruncatedText";
 import {
@@ -59,9 +60,9 @@ export function LegislatorDetail({ id }: { id: number }) {
   return (
     <>
       <p className="mt-0">
-        <a href="#/" className="text-(--app-text-muted)">
+        <Link href="/" className="text-(--app-text-muted)">
           ← all legislators
-        </a>
+        </Link>
       </p>
       <h2 className="mb-0 text-[1.6rem]">
         {formatName(l)}
@@ -196,17 +197,14 @@ export function LegislatorDetail({ id }: { id: number }) {
                   {v.title ? (
                     <TruncatedText
                       text={v.title}
-                      href={`#/rollcall/${v.roll_call_id}`}
+                      href={`/rollcall/${v.roll_call_id}`}
                       maxWidthClass="max-w-[28ch] md:max-w-[34ch]"
                       className="text-[0.92rem]"
                     />
                   ) : (
-                    <a
-                      href={`#/rollcall/${v.roll_call_id}`}
-                      className="text-(--app-link)"
-                    >
+                    <Link href={`/rollcall/${v.roll_call_id}`} className="text-(--app-link)">
                       {v.description}
-                    </a>
+                    </Link>
                   )}
                   <span className="mt-0.5 block text-[0.72rem] tracking-wide text-(--app-text-subtle) uppercase">
                     {v.description}

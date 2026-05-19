@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { RollCallMember } from "../types";
 import { formatName, VOTE_LABEL } from "../types";
+import { Link } from "wouter";
 import { ProvenanceBadge } from "../components/ProvenanceBadge";
 import { partyColorClass, resultColorClass } from "../style/color-classes";
 
@@ -56,16 +57,7 @@ export function RollCallDetail({ id }: { id: number }) {
   return (
     <>
       <p className="mt-0">
-        <a
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            history.back();
-          }}
-          className="text-(--app-text-muted)"
-        >
-          ← back
-        </a>
+        <Link href="/" className="text-(--app-text-muted)">← back</Link>
       </p>
       <h2 className="mb-0 text-[1.4rem]">
         {head.bill_number}: {head.description}
@@ -122,12 +114,9 @@ export function RollCallDetail({ id }: { id: number }) {
                   key={m.people_id}
                   className="border-b border-(--app-border-divider) py-[0.15rem]"
                 >
-                  <a
-                    href={`#/legislator/${m.people_id}`}
-                    className="text-(--app-link)"
-                  >
+                  <Link href={`/legislator/${m.people_id}`} className="text-(--app-link)">
                     {formatName(m)}
-                  </a>
+                  </Link>
                   <span
                     className={`ml-[0.4rem] font-semibold ${partyColorClass(m.party)}`}
                   >
