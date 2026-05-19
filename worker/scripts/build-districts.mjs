@@ -110,7 +110,6 @@ for (const src of SOURCES) {
         '-rename-fields', `district=${src.districtField}`,
         '-each', 'district = +district',
         '-filter', 'district > 0',
-        '-simplify', 'visvalingam', '10%', 'keep-shapes',
         '-clean',
         '-o', `format=geojson`, `precision=0.00001`, outPath,
     ]);
