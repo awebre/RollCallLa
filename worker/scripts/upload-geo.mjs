@@ -42,10 +42,14 @@ for (const { src, key } of FILES) {
         `${bucket}/${key}`,
         '--file', src,
         '--content-type', 'application/json',
-        ...(local ? ['--local'] : []),
+        local ? '--local' : '--remote',
     ];
     console.log(`  uploading ${key}${local ? ' (local)' : ''}...`);
     execFileSync('npx', ['wrangler', ...wranglerArgs], { stdio: 'inherit' });
 }
 
 console.log(`\nDone. ${FILES.length} files uploaded under vintage "${vintage}".`);
+
+// CORS note: bucket CORS must be set once via the Cloudflare API (wrangler's
+// `cors set` command uses a different schema than the API and is currently broken).
+// CF API body: {"rules":[{"allowed":{"origins":["*"],"methods":["GET","HEAD"],"headers":[]},"maxAgeSeconds":86400}]}
