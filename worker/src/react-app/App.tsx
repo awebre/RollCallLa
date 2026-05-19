@@ -6,6 +6,7 @@ import { DistrictMap } from './views/Map';
 import { Status } from './components/Status';
 import { SessionPicker } from './components/SessionPicker';
 import { SessionProvider, useSession } from './SessionContext';
+import { FeedbackProvider, useFeedback } from './FeedbackContext';
 
 const GEO_BASE = import.meta.env.VITE_GEO_BASE_URL ?? '/geo';
 
@@ -39,10 +40,10 @@ function GeoPrefetch() {
     return null;
 }
 
-function App() {
+function AppInner() {
     const { path, param } = useHashRoute();
     return (
-        <SessionProvider>
+        <>
             <GeoPrefetch />
             <main className="box-border mx-auto w-full max-w-260 px-4 pt-8 pb-16 font-serif text-(--app-ink)">
                 <header className="mb-3 border-b-2 border-(--app-ink) pb-2">
@@ -69,6 +70,34 @@ function App() {
                 {path === 'legislator' && param && <LegislatorDetail id={Number(param)} />}
                 {path === 'rollcall' && param && <RollCallDetail id={Number(param)} />}
             </main>
+            <footer className="box-border mx-auto w-full max-w-260 px-4 pb-8 font-serif text-(--app-subtitle) text-sm border-t border-(--app-ink)/20 pt-4">
+                <FooterFeedback />
+            </footer>
+        </>
+    );
+}
+
+function FooterFeedback() {
+    const { openFeedback } = useFeedback();
+    return (
+        <span>
+            See incorrect data?{' '}
+            <button
+                onClick={() => openFeedback()}
+                className="underline cursor-pointer bg-transparent border-none p-0 font-inherit text-inherit italic"
+            >
+                Report an issue.
+            </button>
+        </span>
+    );
+}
+
+function App() {
+    return (
+        <SessionProvider>
+            <FeedbackProvider>
+                <AppInner />
+            </FeedbackProvider>
         </SessionProvider>
     );
 }

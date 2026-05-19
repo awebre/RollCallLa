@@ -7,3 +7,19 @@ interface ImportMetaEnv {
 interface ImportMeta {
     readonly env: ImportMetaEnv;
 }
+
+interface Window {
+    turnstile?: {
+        render: (
+            container: string | HTMLElement,
+            params: {
+                sitekey: string;
+                callback?: (token: string) => void;
+                'error-callback'?: () => void;
+                'expired-callback'?: () => void;
+            },
+        ) => string;
+        reset: (widgetId: string) => void;
+        remove: (widgetId: string) => void;
+    };
+}

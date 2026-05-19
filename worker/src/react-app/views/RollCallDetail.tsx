@@ -3,6 +3,7 @@ import type { RollCallMember } from "../types";
 import { formatName, VOTE_LABEL } from "../types";
 import { ProvenanceBadge } from "../components/ProvenanceBadge";
 import { partyColorClass, resultColorClass } from "../style/color-classes";
+import { ReportIssue } from "../FeedbackContext";
 
 type RollCallHead = {
   roll_call_id: number;
@@ -146,6 +147,7 @@ export function RollCallDetail({ id }: { id: number }) {
           </div>
         ))}
       </section>
+      <ReportIssue category="vote" />
     </>
   );
 }

@@ -9,6 +9,7 @@ import type { Legislator } from "../types";
 import { formatName } from "../types";
 import { useSession } from "../SessionContext";
 import { partyColorClass } from "../style/color-classes";
+import { ReportIssue } from "../FeedbackContext";
 
 // District boundaries are TIGER 2024 (post-2022 redistricting; Acts 1 & 5 of
 // 2022). They remain in force for the 2024–2026 sessions — Nairne v. Landry is
@@ -704,6 +705,7 @@ export function DistrictMap() {
         />
         {mapError && <div style={mapErrorStyle}>{mapError}</div>}
       </div>
+      <ReportIssue category="map" />
     </>
   );
 }

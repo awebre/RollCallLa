@@ -4,6 +4,7 @@ import { formatName } from "../types";
 import { useSession } from "../SessionContext";
 import { ProvenanceBadge } from "../components/ProvenanceBadge";
 import { partyColorClass } from "../style/color-classes";
+import { ReportIssue } from "../FeedbackContext";
 
 export function Roster() {
   const { current } = useSession();
@@ -109,6 +110,7 @@ export function Roster() {
           </tbody>
         </table>
       </div>
+      <ReportIssue category="representative" />
     </>
   );
 }

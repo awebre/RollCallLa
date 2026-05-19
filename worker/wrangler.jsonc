@@ -27,5 +27,14 @@
 			"binding": "GEO_ASSETS",
 			"bucket_name": "roll-call-la-geo"
 		}
-	]
+	],
+	"send_email": [
+		{
+			"name": "SEND_EMAIL",
+			"destination_address": "austin@go-validate.com"
+		}
+	],
+	"vars": {
+		"FEEDBACK_FROM_EMAIL": "feedback@YOUR_DOMAIN"
+	}
 }

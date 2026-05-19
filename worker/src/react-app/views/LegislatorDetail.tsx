@@ -4,6 +4,7 @@ import { formatName, VOTE_LABEL } from "../types";
 import { useSession } from "../SessionContext";
 import { ProvenanceBadge } from "../components/ProvenanceBadge";
 import { TruncatedText } from "../components/TruncatedText";
+import { ReportIssue } from "../FeedbackContext";
 import {
   castVoteColorClass,
   partyColorClass,
@@ -242,6 +243,7 @@ export function LegislatorDetail({ id }: { id: number }) {
           </tbody>
         </table>
       </div>
+      <ReportIssue category="vote" />
     </>
   );
 }
