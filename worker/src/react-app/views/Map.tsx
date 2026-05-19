@@ -10,6 +10,7 @@ import { formatName } from "../types";
 import { useSession } from "../SessionContext";
 import { partyColorClass } from "../style/color-classes";
 import { Link } from "wouter";
+import { useFeedback } from "../FeedbackContext";
 
 // District boundaries are TIGER 2024 (post-2022 redistricting; Acts 1 & 5 of
 // 2022). They remain in force for the 2024–2026 sessions — Nairne v. Landry is
@@ -685,7 +686,7 @@ export function DistrictMap() {
           </>
         )}
       </aside>
-      <p className="mb-3 mt-0 text-[0.82rem] text-(--app-text-muted)">
+      <p className="mb-1 mt-0 text-[0.82rem] text-(--app-text-muted)">
         Not sure you've found your legislator?{" "}
         <a
           href="https://www.legis.la.gov/legis/findmylegislators.aspx"
@@ -696,6 +697,7 @@ export function DistrictMap() {
           Search by address on the Louisiana Legislature site ↗
         </a>
       </p>
+      <MapFeedbackLinks />
       <div className="relative min-h-170">
         <div
           ref={containerRef}
@@ -771,6 +773,28 @@ function HolderRow({
         </Link>
       )}
     </>
+  );
+}
+
+
+function MapFeedbackLinks() {
+  const { openFeedback } = useFeedback();
+  return (
+    <p className="mb-3 text-[0.82rem] text-(--app-text-muted)">
+      <button
+        onClick={() => openFeedback('representative')}
+        className="cursor-pointer bg-transparent border-none p-0 font-inherit text-inherit italic underline"
+      >
+        Report an issue with a representative
+      </button>
+      {" · "}
+      <button
+        onClick={() => openFeedback('map')}
+        className="cursor-pointer bg-transparent border-none p-0 font-inherit text-inherit italic underline"
+      >
+        Report a map or boundary issue
+      </button>
+    </p>
   );
 }
 
