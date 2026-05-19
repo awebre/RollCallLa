@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Legislator } from "../types";
 import { formatName } from "../types";
 import { useSession } from "../SessionContext";
+import { Link } from "wouter";
 import { ProvenanceBadge } from "../components/ProvenanceBadge";
 import { partyColorClass } from "../style/color-classes";
 
@@ -86,12 +87,9 @@ export function Roster() {
                 className="border-b border-(--app-border-row)"
               >
                 <td className="px-1 py-[0.4rem]">
-                  <a
-                    href={`#/legislator/${l.people_id}`}
-                    className="text-(--app-link)"
-                  >
+                  <Link href={`/legislator/${l.people_id}`} className="text-(--app-link)">
                     {formatName(l)}
-                  </a>
+                  </Link>
                   <ProvenanceBadge
                     source={l.source}
                     term_source={l.term_source}

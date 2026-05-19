@@ -1,6 +1,9 @@
 import { Hono } from 'hono';
+import { admin } from './admin';
 
 const app = new Hono<{ Bindings: Env }>();
+
+app.route('/api/admin', admin);
 
 // Read endpoints are eventually-consistent with a once-weekly refresh job.
 // 10-minute browser/edge cache hides cold-D1 latency on the heavier queries
@@ -310,6 +313,72 @@ app.get('/api/rollcalls/:id', async (c) => {
     if (head.results.length === 0) return c.json({ error: 'not found' }, 404);
     c.header('cache-control', CACHE);
     return c.json({ roll_call: head.results[0], members: members.results });
+});
+
+const CATEGORY_LABELS: Record<string, string> = {
+    representative: 'Representative info',
+    vote: 'Vote info',
+    bill: 'Bill info',
+    map: 'Map / boundary',
+};
+
+app.post('/api/feedback', async (c) => {
+    const body = await c.req.json<{
+        category?: string;
+        description?: string;
+        email?: string | null;
+        turnstileToken?: string;
+    }>();
+    const { category, description, email, turnstileToken } = body;
+
+    if (!category || !CATEGORY_LABELS[category] || !description?.trim() || !turnstileToken) {
+        return c.json({ error: 'missing fields' }, 400);
+    }
+
+    // Verify Turnstile token
+    const form = new FormData();
+    form.append('secret', c.env.TURNSTILE_SECRET as string);
+    form.append('response', turnstileToken);
+    const tsRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+        method: 'POST', body: form,
+    });
+    const ts = await tsRes.json<{ success: boolean }>();
+    if (!ts.success) return c.json({ error: 'verification failed' }, 400);
+
+    const subject = `[Roll Call LA] Data issue: ${CATEGORY_LABELS[category]}`;
+    const body_text = [
+        `Category: ${CATEGORY_LABELS[category]}`,
+        '',
+        description.trim(),
+        ...(email ? ['', `Reporter: ${email}`] : []),
+    ].join('\n');
+
+    const replyToHeader = email ? `Reply-To: ${email}\r\n` : '';
+    const rawEmail = [
+        `From: ${c.env.FEEDBACK_FROM_EMAIL}`,
+        `To: austin@go-validate.com`,
+        `Subject: ${subject}`,
+        replyToHeader.trimEnd(),
+        'Content-Type: text/plain; charset=utf-8',
+        'MIME-Version: 1.0',
+        '',
+        body_text,
+    ].filter(s => s !== undefined).join('\r\n');
+
+    await c.env.la_vote_tracker.prepare(
+        `INSERT INTO feedback (category, description, email) VALUES (?, ?, ?)`,
+    ).bind(category, description.trim(), email ?? null).run();
+
+    if (c.env.SEND_EMAIL) {
+        // @ts-ignore — cloudflare:email is a virtual module available at runtime only
+        const { EmailMessage } = await import('cloudflare:email');
+        const msg = new EmailMessage(c.env.FEEDBACK_FROM_EMAIL, 'austin@go-validate.com', rawEmail);
+        await c.env.SEND_EMAIL.send(msg);
+    } else {
+        console.log('[feedback - email not sent in local dev]\n', rawEmail);
+    }
+
+    return c.json({ ok: true });
 });
 
 export default app;

@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import type { Legislator, LegislatorVoteRow } from "../types";
 import { formatName, VOTE_LABEL } from "../types";
 import { useSession } from "../SessionContext";
+import { Link } from "wouter";
+import { useFeedback } from "../FeedbackContext";
 import { ProvenanceBadge } from "../components/ProvenanceBadge";
 import { TruncatedText } from "../components/TruncatedText";
 import {
@@ -19,6 +21,7 @@ type Profile = {
 export function LegislatorDetail({ id }: { id: number }) {
   const { current } = useSession();
   const sessionId = current?.session_id ?? null;
+  const { openFeedback } = useFeedback();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [votes, setVotes] = useState<LegislatorVoteRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,9 +62,9 @@ export function LegislatorDetail({ id }: { id: number }) {
   return (
     <>
       <p className="mt-0">
-        <a href="#/" className="text-(--app-text-muted)">
+        <Link href="/" className="text-(--app-text-muted)">
           ← all legislators
-        </a>
+        </Link>
       </p>
       <h2 className="mb-0 text-[1.6rem]">
         {formatName(l)}
@@ -107,6 +110,14 @@ export function LegislatorDetail({ id }: { id: number }) {
           value={party_line == null ? "—" : `${party_line}%`}
         />
       </section>
+      <p className="text-[0.82rem] text-(--app-text-muted)">
+        <button
+          onClick={() => openFeedback('representative')}
+          className="underline cursor-pointer bg-transparent border-none p-0 font-inherit text-inherit italic"
+        >
+          Report an issue with this representative
+        </button>
+      </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <select
@@ -169,6 +180,7 @@ export function LegislatorDetail({ id }: { id: number }) {
               <th className="px-1 py-2">Tally</th>
               <th className="px-1 py-2">Result</th>
               <th className="px-1 py-2">PDF</th>
+              <th className="px-1 py-2"></th>
             </tr>
           </thead>
           <tbody>
@@ -196,17 +208,14 @@ export function LegislatorDetail({ id }: { id: number }) {
                   {v.title ? (
                     <TruncatedText
                       text={v.title}
-                      href={`#/rollcall/${v.roll_call_id}`}
+                      href={`/rollcall/${v.roll_call_id}`}
                       maxWidthClass="max-w-[28ch] md:max-w-[34ch]"
                       className="text-[0.92rem]"
                     />
                   ) : (
-                    <a
-                      href={`#/rollcall/${v.roll_call_id}`}
-                      className="text-(--app-link)"
-                    >
+                    <Link href={`/rollcall/${v.roll_call_id}`} className="text-(--app-link)">
                       {v.description}
-                    </a>
+                    </Link>
                   )}
                   <span className="mt-0.5 block text-[0.72rem] tracking-wide text-(--app-text-subtle) uppercase">
                     {v.description}
@@ -236,6 +245,15 @@ export function LegislatorDetail({ id }: { id: number }) {
                       PDF ↗
                     </a>
                   ) : null}
+                </td>
+                <td className="px-1 py-[0.4rem]">
+                  <button
+                    onClick={() => openFeedback('vote')}
+                    title="Report an issue with this vote"
+                    className="cursor-pointer bg-transparent border-none p-0 text-(--app-text-muted) hover:text-(--app-ink) text-[0.8rem] leading-none"
+                  >
+                    ⚑
+                  </button>
                 </td>
               </tr>
             ))}
