@@ -7,18 +7,16 @@ import {
 } from '@simplewebauthn/server';
 import type { RegistrationResponseJSON, AuthenticationResponseJSON } from '@simplewebauthn/types';
 
-type AdminEnv = Env & { SESSION_SECRET: string; ADMIN_SETUP_TOKEN: string };
+type AdminEnv = Env & { SESSION_SECRET: string; RP_ID?: string };
 
 export const admin = new Hono<{ Bindings: AdminEnv }>();
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-function getRpInfo(req: Request): { rpID: string; origin: string } {
-    const url = new URL(req.url);
-    return {
-        rpID: url.hostname,
-        origin: `${url.protocol}//${url.host}`,
-    };
+function getRpInfo(req: Request, env: AdminEnv): { rpID: string; origin: string } {
+    const rpID = env.RP_ID ?? new URL(req.url).hostname;
+    const scheme = rpID === 'localhost' || rpID.startsWith('127.') ? 'http' : 'https';
+    return { rpID, origin: `${scheme}://${rpID}` };
 }
 
 async function sign(payload: string, secret: string): Promise<string> {
@@ -62,11 +60,28 @@ function getSessionToken(req: Request): string | null {
     return match ? match[1] : null;
 }
 
+async function digestToken(token: string): Promise<ArrayBuffer> {
+    return crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+}
+
+function timingSafeEqual(a: ArrayBuffer, b: ArrayBuffer): boolean {
+    if (a.byteLength !== b.byteLength) return false;
+    const av = new Uint8Array(a);
+    const bv = new Uint8Array(b);
+    let diff = 0;
+    for (let i = 0; i < av.length; i++) diff |= av[i] ^ bv[i];
+    return diff === 0;
+}
+
 async function requireSetupToken(c: { req: { raw: Request }; env: AdminEnv }, next: () => Promise<Response>): Promise<Response> {
     const provided = c.req.raw.headers.get('X-Admin-Setup-Token');
-    if (!c.env.ADMIN_SETUP_TOKEN || provided !== c.env.ADMIN_SETUP_TOKEN) {
-        return Response.json({ error: 'forbidden' }, { status: 403 });
-    }
+    if (!provided) return Response.json({ error: 'forbidden' }, { status: 403 });
+    const db = c.env.la_vote_tracker;
+    const row = await db.prepare(`SELECT token_hash FROM admin_setup_token WHERE id = 1`).first<{ token_hash: string }>();
+    if (!row) return Response.json({ error: 'forbidden' }, { status: 403 });
+    const providedDigest = await digestToken(provided);
+    const storedDigest = Uint8Array.from(atob(row.token_hash), (ch) => ch.charCodeAt(0)).buffer;
+    if (!timingSafeEqual(providedDigest, storedDigest)) return Response.json({ error: 'forbidden' }, { status: 403 });
     return next();
 }
 
@@ -107,7 +122,7 @@ admin.post('/setup/challenge', async (c) => {
     const existing = await db.prepare(`SELECT id FROM admin_credentials LIMIT 1`).first();
     if (existing) return c.json({ error: 'already registered' }, 403);
 
-    const { rpID } = getRpInfo(c.req.raw);
+    const { rpID } = getRpInfo(c.req.raw, c.env);
     const options = await generateRegistrationOptions({
         rpName: 'Roll Call LA',
         rpID,
@@ -138,7 +153,7 @@ admin.post('/setup/verify', async (c) => {
     if (!challenge) return c.json({ error: 'no pending challenge' }, 400);
 
     const body = await c.req.json<RegistrationResponseJSON>();
-    const { rpID, origin } = getRpInfo(c.req.raw);
+    const { rpID, origin } = getRpInfo(c.req.raw, c.env);
 
     const { verified, registrationInfo } = await verifyRegistrationResponse({
         response: body,
@@ -153,9 +168,11 @@ admin.post('/setup/verify', async (c) => {
     const { credential } = registrationInfo;
     const publicKeyB64 = btoa(String.fromCharCode(...credential.publicKey));
 
-    await db.prepare(
-        `INSERT INTO admin_credentials (credential_id, public_key, counter) VALUES (?, ?, ?)`,
-    ).bind(credential.id, publicKeyB64, credential.counter).run();
+    await db.batch([
+        db.prepare(`INSERT INTO admin_credentials (credential_id, public_key, counter) VALUES (?, ?, ?)`)
+            .bind(credential.id, publicKeyB64, credential.counter),
+        db.prepare(`DELETE FROM admin_setup_token WHERE id = 1`),
+    ]);
 
     return c.json({ ok: true });
 });
@@ -169,7 +186,7 @@ admin.post('/auth/challenge', async (c) => {
     ).first<{ credential_id: string }>();
     if (!cred) return c.json({ error: 'no credential registered' }, 404);
 
-    const { rpID } = getRpInfo(c.req.raw);
+    const { rpID } = getRpInfo(c.req.raw, c.env);
     const options = await generateAuthenticationOptions({
         rpID,
         allowCredentials: [{ id: cred.credential_id }],
@@ -191,7 +208,7 @@ admin.post('/auth/verify', async (c) => {
     if (!cred) return c.json({ error: 'no credential registered' }, 404);
 
     const body = await c.req.json<AuthenticationResponseJSON>();
-    const { rpID, origin } = getRpInfo(c.req.raw);
+    const { rpID, origin } = getRpInfo(c.req.raw, c.env);
 
     const publicKey = Uint8Array.from(atob(cred.public_key), (ch) => ch.charCodeAt(0));
 
