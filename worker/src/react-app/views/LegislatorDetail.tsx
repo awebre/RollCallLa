@@ -100,14 +100,15 @@ export function LegislatorDetail({ id }: { id: number }) {
       )}
 
       <section className="my-5 grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-2">
-        <Stat label="Yea (FP)" value={t.yea} />
-        <Stat label="Nay (FP)" value={t.nay} />
-        <Stat label="No vote" value={t.nv} />
-        <Stat label="Absent" value={t.absent} />
-        <Stat label="Total FP" value={fp_total} />
+        <Stat label="Yea (FP)" value={t.yea} help="Yea votes on final passage roll calls for the selected session. FP = Final Passage — the decisive up/down vote on a bill." />
+        <Stat label="Nay (FP)" value={t.nay} help="Nay votes on final passage roll calls. This total may be higher than what you see in the list below if you've applied filters." />
+        <Stat label="No vote" value={t.nv} help="Roll calls where the legislator was present but did not cast a vote." />
+        <Stat label="Absent" value={t.absent} help="Roll calls where the legislator was recorded as absent." />
+        <Stat label="Total FP" value={fp_total} help="Total final passage roll calls the legislator participated in during the selected session." />
         <Stat
           label="Party-line"
           value={party_line == null ? "—" : `${party_line}%`}
+          help="Percentage of final passage votes where this legislator voted the same way as the majority of their party colleagues in the same chamber."
         />
       </section>
       <p className="text-[0.82rem] text-(--app-text-muted)">
@@ -271,13 +272,27 @@ function partyName(p: string | null) {
   return "Unaffiliated";
 }
 
-function Stat({ label, value }: { label: string; value: number | string }) {
+function Stat({ label, value, help }: { label: string; value: number | string; help?: string }) {
   return (
-    <div className="border border-(--app-border-light) bg-(--app-surface) px-3 py-2.5">
-      <div className="text-[0.7rem] tracking-wide uppercase text-(--app-text-muted)">
+    <div className="relative border border-(--app-border-light) bg-(--app-surface) px-3 py-2.5">
+      <div className="flex items-center gap-1 text-[0.7rem] tracking-wide uppercase text-(--app-text-muted)">
         {label}
+        {help && <StatHelp text={help} />}
       </div>
       <div className="font-mono text-[1.4rem]">{value}</div>
     </div>
+  );
+}
+
+function StatHelp({ text }: { text: string }) {
+  return (
+    <span className="group relative inline-flex">
+      <span className="inline-flex h-3.5 w-3.5 cursor-default items-center justify-center rounded-full border border-(--app-border-input) text-[0.6rem] leading-none text-(--app-text-muted)">
+        ?
+      </span>
+      <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 w-56 -translate-x-1/2 rounded border border-(--app-border-light) bg-(--app-surface-warm) p-2 text-[0.75rem] leading-snug normal-case tracking-normal text-(--app-ink) shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
+        {text}
+      </span>
+    </span>
   );
 }
