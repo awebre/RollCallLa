@@ -3,7 +3,7 @@ import type { FeedbackCategory } from '../FeedbackContext';
 import { CATEGORY_LABELS } from '../FeedbackContext';
 
 const CATEGORIES: FeedbackCategory[] = ['representative', 'vote', 'bill', 'map'];
-const SITEKEY = '0x4AAAAAADSkChqMyzEbU6Vb';
+const SITEKEY = import.meta.env.VITE_TURNSTILE_SITEKEY ?? '0x4AAAAAADSkChqMyzEbU6Vb';
 
 export function FeedbackModal({
     initialCategory,

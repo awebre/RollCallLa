@@ -63,6 +63,7 @@ export function AdminView() {
         setError(null);
         setBusy(true);
         try {
+
             const opts = await fetch('/api/admin/setup/challenge', {
                 method: 'POST',
                 headers: { 'X-Admin-Setup-Token': setupToken },
@@ -85,7 +86,12 @@ export function AdminView() {
 
             setState('login');
         } catch (e) {
-            setError(e instanceof Error ? e.message : 'Setup failed');
+            const msg = e instanceof Error ? e.message : 'Setup failed';
+            setError(
+                msg.toLowerCase().includes('cancel') || msg.toLowerCase().includes('not allowed')
+                    ? 'Cancelled. If 1Password intercepted, dismiss it and click Register again — the browser will use Touch ID directly.'
+                    : msg,
+            );
         } finally {
             setBusy(false);
         }
@@ -112,7 +118,12 @@ export function AdminView() {
             setState('dashboard');
             loadFeedback('');
         } catch (e) {
-            setError(e instanceof Error ? e.message : 'Login failed');
+            const msg = e instanceof Error ? e.message : 'Login failed';
+            setError(
+                msg.toLowerCase().includes('cancel') || msg.toLowerCase().includes('not allowed')
+                    ? 'Cancelled. Click Sign in again to retry.'
+                    : msg,
+            );
         } finally {
             setBusy(false);
         }
