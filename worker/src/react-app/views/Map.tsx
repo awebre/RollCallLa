@@ -690,6 +690,17 @@ export function DistrictMap() {
           </>
         )}
       </aside>
+      <p className="mb-3 mt-0 text-[0.82rem] text-(--app-text-muted)">
+        Not sure you've found your legislator?{" "}
+        <a
+          href="https://www.legis.la.gov/legis/findmylegislators.aspx"
+          target="_blank"
+          rel="noreferrer"
+          className="text-(--app-link-ext)"
+        >
+          Search by address on the Louisiana Legislature site ↗
+        </a>
+      </p>
       <div className="relative min-h-170">
         <div
           ref={containerRef}
