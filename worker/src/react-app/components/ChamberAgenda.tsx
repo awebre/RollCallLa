@@ -361,7 +361,7 @@ export function AgendaRow({
   const isCurrent = item.status === "current";
 
   const billLink = sessionName
-    ? `https://legis.la.gov/legis/BillInfo.aspx?s=${sessionName}&b=${encodeURIComponent(item.bill_number)}`
+    ? `https://legis.la.gov/legis/BillInfo.aspx?s=${sessionName}&b=${item.bill_number.replace(/\s+/g, "")}`
     : null;
 
   return (

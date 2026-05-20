@@ -80,7 +80,7 @@ export function RollCallDetail({ id }: { id: number }) {
       </p>
       <p className="text-[0.85rem]">
         <a
-          href={`https://legis.la.gov/legis/BillInfo.aspx?s=${head.session_name}&b=${encodeURIComponent(head.bill_number)}`}
+          href={`https://legis.la.gov/legis/BillInfo.aspx?s=${head.session_name}&b=${head.bill_number.replace(/\s+/g, "")}`}
           target="_blank"
           rel="noreferrer"
           className="text-(--app-link-ext)"

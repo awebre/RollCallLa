@@ -237,7 +237,7 @@ export function LegislatorDetail({ id }: { id: number }) {
                 <td className="px-1 py-[0.4rem]">
                   {current ? (
                     <a
-                      href={`https://legis.la.gov/legis/BillInfo.aspx?s=${current.name}&b=${encodeURIComponent(v.bill_number)}`}
+                      href={`https://legis.la.gov/legis/BillInfo.aspx?s=${current.name}&b=${v.bill_number.replace(/\s+/g, "")}`}
                       target="_blank"
                       rel="noreferrer"
                       className="text-(--app-link-ext)"
