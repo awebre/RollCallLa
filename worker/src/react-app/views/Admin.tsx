@@ -31,7 +31,8 @@ export function AdminView() {
     const [state, setState] = useState<AdminState>('loading');
     const [setupToken, setSetupToken] = useState('');
     const [feedback, setFeedback] = useState<FeedbackRow[]>([]);
-    const [statusFilter, setStatusFilter] = useState('');
+    const [counts, setCounts] = useState<Record<string, number>>({});
+    const [statusFilter, setStatusFilter] = useState('new');
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
 
@@ -41,7 +42,8 @@ export function AdminView() {
             .then((data) => {
                 if (data.authenticated) {
                     setState('dashboard');
-                    loadFeedback('');
+                    loadFeedback('new');
+                    loadCounts();
                 } else if (data.credential_exists) {
                     setState('login');
                 } else {
@@ -57,6 +59,13 @@ export function AdminView() {
             r.json() as Promise<{ feedback: FeedbackRow[] }>,
         );
         setFeedback(data.feedback);
+    }
+
+    async function loadCounts() {
+        const data = await fetch('/api/admin/feedback/counts').then((r) =>
+            r.json() as Promise<Record<string, number>>,
+        );
+        setCounts(data);
     }
 
     async function handleSetup() {
@@ -116,7 +125,8 @@ export function AdminView() {
             if (!res.ok) throw new Error('Authentication failed');
 
             setState('dashboard');
-            loadFeedback('');
+            loadFeedback('new');
+            loadCounts();
         } catch (e) {
             const msg = e instanceof Error ? e.message : 'Login failed';
             setError(
@@ -129,12 +139,6 @@ export function AdminView() {
         }
     }
 
-    async function handleLogout() {
-        await fetch('/api/admin/logout', { method: 'POST' });
-        setState('login');
-        setFeedback([]);
-    }
-
     async function setStatus(id: number, status: string) {
         await fetch(`/api/admin/feedback/${id}`, {
             method: 'PATCH',
@@ -142,6 +146,7 @@ export function AdminView() {
             body: JSON.stringify({ status }),
         });
         setFeedback((rows) => rows.map((r) => (r.id === id ? { ...r, status } : r)));
+        loadCounts();
     }
 
     async function applyFilter(filter: string) {
@@ -196,32 +201,35 @@ export function AdminView() {
         );
     }
 
+    const totalCount = Object.values(counts).reduce((a, b) => a + b, 0);
+
     return (
         <div>
             <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-semibold">Feedback</h2>
-                <button
-                    onClick={handleLogout}
-                    className="text-sm text-(--app-subtitle) underline"
-                >
-                    Log out
-                </button>
+                <a href="/" className="text-sm text-(--app-subtitle) underline">← Back to site</a>
             </div>
 
             <div className="flex gap-2 mb-5 flex-wrap">
-                {['', 'new', 'in_progress', 'addressed', 'dismissed'].map((s) => (
+                {(['', 'new', 'in_progress', 'addressed', 'dismissed'] as const).map((s) => {
+                    const count = s ? (counts[s] ?? 0) : totalCount;
+                    return (
                     <button
                         key={s}
                         onClick={() => applyFilter(s)}
-                        className={`px-3 py-1 rounded-full border text-sm ${
+                        className={`cursor-pointer px-3 py-1 rounded-full border text-sm inline-flex items-center gap-1.5 transition-colors ${
                             statusFilter === s
                                 ? 'bg-(--app-ink) text-(--app-bg) border-(--app-ink)'
-                                : 'border-(--app-ink)/30 text-(--app-subtitle)'
+                                : 'border-(--app-ink)/30 text-(--app-subtitle) hover:border-(--app-ink)/60 hover:text-(--app-ink)'
                         }`}
                     >
                         {s ? STATUS_LABELS[s] : 'All'}
+                        <span className={`text-xs tabular-nums ${statusFilter === s ? 'opacity-70' : 'opacity-50'}`}>
+                            {count}
+                        </span>
                     </button>
-                ))}
+                    );
+                })}
             </div>
 
             {feedback.length === 0 ? (

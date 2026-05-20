@@ -11,6 +11,7 @@ import { useSession } from "../SessionContext";
 import { partyColorClass } from "../style/color-classes";
 import { Link } from "wouter";
 import { useFeedback } from "../FeedbackContext";
+import { ChamberToggle } from "../components/ChamberToggle";
 
 // District boundaries are TIGER 2024 (post-2022 redistricting; Acts 1 & 5 of
 // 2022). They remain in force for the 2024–2026 sessions — Nairne v. Landry is
@@ -522,30 +523,12 @@ export function DistrictMap() {
         aria-label="District search controls"
         className="my-4 flex flex-wrap items-end gap-4"
       >
-        <div
-          role="tablist"
-          aria-label="Chamber"
-          className="inline-flex flex-none gap-0.5 rounded-lg border border-(--app-navy-border) bg-(--app-navy-bg) p-0.75"
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={chamber === "H"}
-            onClick={() => setChamber("H")}
-            className={chamberToggleBtnClass(chamber === "H")}
-          >
-            House <span className={chamberCountClass(chamber === "H")}>105</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={chamber === "S"}
-            onClick={() => setChamber("S")}
-            className={chamberToggleBtnClass(chamber === "S")}
-          >
-            Senate <span className={chamberCountClass(chamber === "S")}>39</span>
-          </button>
-        </div>
+        <ChamberToggle
+          value={chamber}
+          onChange={setChamber}
+          countH={105}
+          countS={39}
+        />
 
         <label className="flex min-w-65 flex-1 flex-col gap-1">
           <span className="px-1 font-mono text-[0.75rem] tracking-[1.5px] text-(--app-subtitle) uppercase">
@@ -817,13 +800,6 @@ function LegendSwatch({ color, label }: { color: string; label: string }) {
   );
 }
 
-function chamberToggleBtnClass(active: boolean): string {
-  return `inline-flex items-center gap-[0.4rem] rounded-[6px] border-none px-[1.1rem] py-[0.55rem] text-base font-inherit transition-[background,color] duration-120 ease-in ${active ? "cursor-default bg-(--app-navy-active-bg) text-(--app-navy-active-text) font-bold" : "cursor-pointer bg-transparent text-(--app-navy-inactive-text) font-medium"}`;
-}
-
-function chamberCountClass(active: boolean): string {
-  return `rounded px-1.5 py-px font-mono text-[0.7rem] font-semibold ${active ? "bg-(--app-navy-count-active-bg) text-(--app-navy-active-text)" : "bg-(--app-navy-count-bg) text-(--app-navy-count-text)"}`;
-}
 
 const mapErrorStyle: CSSProperties = {
   position: "absolute",

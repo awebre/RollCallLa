@@ -1,4 +1,6 @@
 interface Env {
+    la_vote_tracker: D1Database;
+    GEO_ASSETS: R2Bucket;
     TURNSTILE_SECRET: string;
     FEEDBACK_FROM_EMAIL: string;
     SEND_EMAIL?: SendEmail;

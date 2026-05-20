@@ -11,6 +11,7 @@ import {
   partyColorClass,
   resultColorClass,
 } from "../style/color-classes";
+import { ChamberAgenda } from "../components/ChamberAgenda";
 
 type Profile = {
   legislator: Legislator;
@@ -59,10 +60,19 @@ export function LegislatorDetail({ id }: { id: number }) {
   const { legislator: l, final_passage_tally: t, party_line } = profile;
   const fp_total = t.yea + t.nay + t.nv + t.absent;
 
+  // Derive the chamber-site profile URL from the encoded people_id.
+  // Encoding: Senate = 10000 + site_id, House = 20000 + site_id.
+  // Not available for pdf-only legislators (no roster match).
+  const profileUrl = l.source !== 'pdf' && l.role
+    ? l.role === 'Sen'
+      ? `https://senate.la.gov/smembers.aspx?ID=${l.people_id - 10000}`
+      : `https://house.louisiana.gov/H_Reps/members.aspx?ID=${l.people_id - 20000}`
+    : null;
+
   return (
     <>
       <p className="mt-0">
-        <Link href="/" className="text-(--app-text-muted)">
+        <Link href="/roster" className="text-(--app-text-muted)">
           ← all legislators
         </Link>
       </p>
@@ -82,6 +92,19 @@ export function LegislatorDetail({ id }: { id: number }) {
         {l.role === "Sen" ? "Senator" : "Representative"}
         {l.district ? ` · District ${l.district}` : ""}
         {l.active === 0 ? " · not currently serving" : ""}
+        {profileUrl && (
+          <>
+            {" · "}
+            <a
+              href={profileUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-(--app-link-ext)"
+            >
+              Official profile ↗
+            </a>
+          </>
+        )}
       </p>
       {(l.term_start || l.term_end || l.year_elected) && (
         <p className="mt-[0.2rem] font-mono text-[0.85rem] text-(--app-text-muted)">
@@ -120,7 +143,27 @@ export function LegislatorDetail({ id }: { id: number }) {
         </button>
       </p>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
+      {l.role && (
+        <>
+          <div className="mt-7 mb-3 flex items-center gap-3">
+            <span className="text-[0.75rem] font-semibold uppercase tracking-widest text-(--app-text-muted)">
+              Floor Agenda
+            </span>
+            <div className="flex-1 border-t border-(--app-border-light)" />
+          </div>
+          <ChamberAgenda chamber={l.role === "Sen" ? "S" : "H"} showEmpty />
+        </>
+      )}
+
+      {/* Vote History */}
+      <div className="mt-7 mb-3 flex items-center gap-3">
+        <span className="text-[0.75rem] font-semibold uppercase tracking-widest text-(--app-text-muted)">
+          Vote History
+        </span>
+        <div className="flex-1 border-t border-(--app-border-light)" />
+      </div>
+
+      <div className="mt-0 flex flex-wrap items-center gap-3">
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
@@ -194,7 +237,7 @@ export function LegislatorDetail({ id }: { id: number }) {
                 <td className="px-1 py-[0.4rem]">
                   {current ? (
                     <a
-                      href={`https://legis.la.gov/legis/BillInfo.aspx?s=${current.name}&b=${encodeURIComponent(v.bill_number)}`}
+                      href={`https://legis.la.gov/legis/BillInfo.aspx?s=${current.name}&b=${v.bill_number.replace(/\s+/g, "")}`}
                       target="_blank"
                       rel="noreferrer"
                       className="text-(--app-link-ext)"
