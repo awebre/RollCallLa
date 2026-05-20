@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Switch, Route, Link, Redirect, useLocation } from 'wouter';
+import { Switch, Route, Link, Redirect, useLocation, useRoute } from 'wouter';
 import { Roster } from './views/Roster';
 import { LegislatorDetail } from './views/LegislatorDetail';
 import { RollCallDetail } from './views/RollCallDetail';
@@ -29,10 +29,6 @@ function GeoPrefetch() {
 }
 
 function Shell() {
-    const [location] = useLocation();
-    const path    = location.split('/')[1] ?? '';
-    const subpath = location.split('/')[2] ?? '';
-
     return (
         <SessionProvider>
             <FeedbackProvider>
@@ -53,12 +49,10 @@ function Shell() {
                         <Status />
                     </header>
                     <nav className="mb-5 flex gap-5 text-[0.95rem]">
-                        <Link href="/" className={navLinkClass(path === '' || path === 'map')}>District Map</Link>
-                        <Link href="/roster" className={navLinkClass(path === 'roster' || path === 'legislator')}>Roster</Link>
-                        <Link href="/agenda/H" className={navLinkClass(path === 'agenda')}>
-                            Agenda{path === 'agenda' && subpath ? ` · ${subpath === 'H' ? 'House' : 'Senate'}` : ''}
-                        </Link>
-                        <AdminNavLink path={path} />
+                        <MapNavLink />
+                        <RosterNavLink />
+                        <AgendaNavLink />
+                        <AdminNavLink />
                     </nav>
 
                     <Switch>
@@ -91,11 +85,32 @@ function Shell() {
     );
 }
 
-function AdminNavLink({ path }: { path: string }) {
+function MapNavLink() {
+    const [onMap]  = useRoute('/map');
+    const [onRoot] = useRoute('/');
+    return <Link href="/map" className={navLinkClass(onMap || onRoot)}>District Map</Link>;
+}
+
+function RosterNavLink() {
+    const [onRoster]     = useRoute('/roster');
+    const [onLegislator] = useRoute('/legislator/:id');
+    return <Link href="/roster" className={navLinkClass(onRoster || onLegislator)}>Roster</Link>;
+}
+
+function AgendaNavLink() {
+    const [active, params] = useRoute('/agenda/:chamber');
+    const label = active && params?.chamber
+        ? `Agenda · ${params.chamber === 'H' ? 'House' : 'Senate'}`
+        : 'Agenda';
+    return <Link href="/agenda/H" className={navLinkClass(active)}>{label}</Link>;
+}
+
+function AdminNavLink() {
     const { isAdmin } = useAdmin();
+    const [active]    = useRoute('/admin');
     if (!isAdmin) return null;
     return (
-        <Link href="/admin" className={`ml-auto ${navLinkClass(path === 'admin')}`}>
+        <Link href="/admin" className={`ml-auto ${navLinkClass(active)}`}>
             Admin
         </Link>
     );
