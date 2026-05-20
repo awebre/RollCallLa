@@ -53,6 +53,7 @@ function Shell() {
                         <RosterNavLink />
                         <AgendaNavLink />
                         <AdminNavLink />
+                        <LogoutNavButton />
                     </nav>
 
                     <Switch>
@@ -113,6 +114,19 @@ function AdminNavLink() {
         <Link href="/admin" className={`ml-auto ${navLinkClass(active)}`}>
             Admin
         </Link>
+    );
+}
+
+function LogoutNavButton() {
+    const { isAdmin, logout } = useAdmin();
+    if (!isAdmin) return null;
+    return (
+        <button
+            onClick={logout}
+            className={`cursor-pointer bg-transparent border-none p-0 font-inherit text-[0.95rem] ${navLinkClass(false)}`}
+        >
+            Log out
+        </button>
     );
 }
 

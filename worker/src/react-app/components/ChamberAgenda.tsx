@@ -3,11 +3,20 @@ import { Link } from "wouter";
 import { useSession } from "../SessionContext";
 import { useDebug } from "../debug/DebugContext";
 
+export type AgendaCategory =
+  | "final_passage"
+  | "concurrence"
+  | "second_reading"
+  | "introduction"
+  | "deferred"
+  | "other";
+
 export type AgendaItem = {
   bill_number: string;
   author: string;
   subject: string;
   status: "future" | "current" | "past";
+  category: AgendaCategory;
 };
 
 export type AgendaResult = {
@@ -16,6 +25,8 @@ export type AgendaResult = {
   time: string | null;
   location: string | null;
   items: AgendaItem[];
+  in_progress: boolean;
+  adjourned: boolean;
   fetched_at: string;
   ok: boolean;
   error?: string;
@@ -25,20 +36,34 @@ const WINDOW = 10; // visible rows at a time
 const PAGE   = 5;  // rows revealed per expand click
 const CONTEXT = 3; // past rows to show above the current item initially
 
-/** Compute the initial visible window centred on the current (or first future) item. */
+/** Compute the initial visible window centred on the current (or boundary) item.
+ *  When no item is current (gap between votes), show the last-past/first-future
+ *  boundary so the view stays at the action rather than jumping to the start. */
 function initialWindow(items: AgendaItem[]): { start: number; end: number } {
   const currentIdx = items.findIndex((i) => i.status === "current");
-  const pivot      = currentIdx >= 0 ? currentIdx : items.findIndex((i) => i.status === "future");
-  const p          = pivot >= 0 ? pivot : 0;
+  let pivot: number;
+  if (currentIdx >= 0) {
+    pivot = currentIdx;
+  } else {
+    // Find the boundary: first future item, falling back to just after the last past.
+    const firstFuture = items.findIndex((i) => i.status === "future");
+    if (firstFuture >= 0) {
+      pivot = firstFuture;
+    } else {
+      // All past or all future — show end/start respectively.
+      pivot = items.length - 1;
+    }
+  }
   return {
-    start: Math.max(0, p - CONTEXT),
-    end:   Math.min(items.length, p - CONTEXT + WINDOW),
+    start: Math.max(0, pivot - CONTEXT),
+    end:   Math.min(items.length, pivot - CONTEXT + WINDOW),
   };
 }
 
 // ── Shared data-fetching hook ─────────────────────────────────────────────────
 
-const POLL_MS = 5 * 60 * 1000; // matches server-side cache TTL
+const POLL_MS_LIVE = 1  * 60 * 1000; // 1 min  — matches server TTL when in_progress
+const POLL_MS_IDLE = 30 * 60 * 1000; // 30 min — matches server TTL when idle
 
 export function useAgendaData(chamber: "H" | "S") {
   const { getOverride } = useDebug();
@@ -87,7 +112,8 @@ export function useAgendaData(chamber: "H" | "S") {
       setRefetchKey((k) => k + 1);
     };
 
-    setNextRefreshAt(Date.now() + POLL_MS);
+    const pollMs = agenda.in_progress ? POLL_MS_LIVE : POLL_MS_IDLE;
+    setNextRefreshAt(Date.now() + pollMs);
     timeoutId = setTimeout(() => {
       if (document.visibilityState === "hidden") {
         // Tab hidden — defer until it becomes visible again.
@@ -102,7 +128,7 @@ export function useAgendaData(chamber: "H" | "S") {
       } else {
         triggerRefetch();
       }
-    }, POLL_MS);
+    }, pollMs);
 
     return () => {
       clearTimeout(timeoutId);
@@ -114,25 +140,29 @@ export function useAgendaData(chamber: "H" | "S") {
   return { agenda, loading, nextRefreshAt };
 }
 
-function refreshLabel(nextRefreshAt: number | null): string {
-  if (!nextRefreshAt) return "refreshed every 5 min";
+function refreshLabel(nextRefreshAt: number | null, inProgress?: boolean): string {
+  if (!nextRefreshAt) return inProgress ? "refreshed every 1 min" : "refreshed every 30 min";
   const msLeft = nextRefreshAt - Date.now();
   if (msLeft <= 0) return "refreshing…";
-  const minLeft = Math.ceil(msLeft / 60_000);
-  return `refreshes in ${minLeft} min`;
+  const secLeft = Math.ceil(msLeft / 1_000);
+  if (secLeft < 60) return `refreshes in ${secLeft}s`;
+  return `refreshes in ${Math.ceil(secLeft / 60)} min`;
 }
 
 // ── Panel (embedded in legislator detail) ────────────────────────────────────
 
+const VOTE_CATEGORIES: AgendaCategory[] = ["final_passage", "concurrence"];
+
 export function ChamberAgenda({ chamber, showEmpty }: { chamber: "H" | "S"; showEmpty?: boolean }) {
   const { current }                          = useSession();
   const { agenda, loading, nextRefreshAt }   = useAgendaData(chamber);
+  const [showAll, setShowAll]                = useState(false);
 
   // Re-render every 30 s so the countdown stays roughly accurate.
   const [, setTick] = useState(0);
   useEffect(() => {
     if (!nextRefreshAt) return;
-    const id = setInterval(() => setTick((t) => t + 1), 30_000);
+    const id = setInterval(() => setTick((t) => t + 1), 10_000);
     return () => clearInterval(id);
   }, [nextRefreshAt]);
 
@@ -145,11 +175,15 @@ export function ChamberAgenda({ chamber, showEmpty }: { chamber: "H" | "S"; show
 
   // Reset window when agenda data arrives or changes
   useEffect(() => {
-    if (!agenda?.items.length) return;
-    const { start, end } = initialWindow(agenda.items);
+    // Compute the window against the filtered list so slicing is always in-bounds.
+    const all  = agenda?.items ?? [];
+    const vote = all.filter((i) => VOTE_CATEGORIES.includes(i.category));
+    const target = showAll ? all : (vote.length > 0 ? vote : all);
+    if (!target.length) return;
+    const { start, end } = initialWindow(target);
     setVisibleStart(start);
     setVisibleEnd(end);
-  }, [agenda]);
+  }, [agenda, showAll]);
 
   // Scroll after a window expansion
   useEffect(() => {
@@ -162,7 +196,7 @@ export function ChamberAgenda({ chamber, showEmpty }: { chamber: "H" | "S"; show
     pendingScroll.current = null;
   });
 
-  if (loading) {
+  if (loading && !agenda) {
     return (
       <div className="border border-(--app-border-light) bg-(--app-surface) px-4 py-3">
         <p className="text-[0.85rem] text-(--app-text-muted)">Loading floor agenda…</p>
@@ -184,7 +218,13 @@ export function ChamberAgenda({ chamber, showEmpty }: { chamber: "H" | "S"; show
 
   const sessionName = current?.name ?? null;
   const chamberName = chamber === "H" ? "House" : "Senate";
-  const { items }   = agenda;
+
+  // Filter to vote-relevant items unless the user expanded to show all.
+  const allItems      = agenda.items;
+  const voteItems     = allItems.filter((i) => VOTE_CATEGORIES.includes(i.category));
+  const items         = showAll ? allItems : (voteItems.length > 0 ? voteItems : allItems);
+  const hiddenCount   = allItems.length - voteItems.length;
+
   const pastCount   = items.filter((i) => i.status === "past").length;
   const futureCount = items.filter((i) => i.status === "future").length;
 
@@ -207,6 +247,20 @@ export function ChamberAgenda({ chamber, showEmpty }: { chamber: "H" | "S"; show
       {/* Header */}
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-(--app-border-light) bg-(--app-surface-warm) px-4 py-2.5">
         <span className="font-semibold text-[0.9rem]">{chamberName} Floor Agenda</span>
+        {agenda.in_progress && (
+          <span
+            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-sans text-[0.68rem] font-semibold uppercase tracking-wide text-(--vote-yea)"
+            style={{ backgroundColor: "color-mix(in srgb, var(--vote-yea) 12%, transparent)" }}
+          >
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-(--vote-yea)" />
+            Live
+          </span>
+        )}
+        {agenda.adjourned && (
+          <span className="inline-flex items-center rounded-full px-2 py-0.5 font-sans text-[0.68rem] font-semibold uppercase tracking-wide text-(--app-text-muted) border border-(--app-border-input)">
+            Adjourned
+          </span>
+        )}
         {agenda.date && (
           <span className="font-mono text-[0.78rem] text-(--app-text-muted)">
             {agenda.date}{agenda.time ? ` · ${agenda.time}` : ""}
@@ -215,9 +269,17 @@ export function ChamberAgenda({ chamber, showEmpty }: { chamber: "H" | "S"; show
         {agenda.location && (
           <span className="font-mono text-[0.78rem] text-(--app-text-muted)">{agenda.location}</span>
         )}
-        <span className="ml-auto font-mono text-[0.72rem] text-(--app-text-subtle)">
+        <span className="ml-auto flex items-center gap-2 font-mono text-[0.72rem] text-(--app-text-subtle)">
           {pastCount > 0 && <span className="text-(--app-text-muted)">{pastCount} done · </span>}
           {futureCount} remaining
+          {hiddenCount > 0 && (
+            <button
+              onClick={() => setShowAll((v) => !v)}
+              className="cursor-pointer rounded border border-(--app-border-input) bg-(--app-surface) px-1.5 py-0.5 font-sans text-[0.68rem] text-(--app-text-muted) hover:bg-(--app-surface-warm)"
+            >
+              {showAll ? "Votes only" : `+${hiddenCount} more`}
+            </button>
+          )}
         </span>
       </div>
 
@@ -268,7 +330,7 @@ export function ChamberAgenda({ chamber, showEmpty }: { chamber: "H" | "S"; show
           >
             legis.la.gov
           </a>
-          {" · "}{refreshLabel(nextRefreshAt)}
+          {" · "}{refreshLabel(nextRefreshAt, agenda.in_progress)}
         </span>
       </div>
     </div>
@@ -277,12 +339,23 @@ export function ChamberAgenda({ chamber, showEmpty }: { chamber: "H" | "S"; show
 
 // ── Shared row ────────────────────────────────────────────────────────────────
 
+const CATEGORY_LABEL: Record<AgendaCategory, string | null> = {
+  final_passage:  null,           // primary content — no label needed
+  concurrence:    "Concurrence",
+  second_reading: "2nd Reading",
+  introduction:   "Introduction",
+  deferred:       "Deferred",
+  other:          null,
+};
+
 export function AgendaRow({
   item,
   sessionName,
+  showCategory,
 }: {
   item: AgendaItem;
   sessionName?: string | null;
+  showCategory?: boolean;
 }) {
   const isPast    = item.status === "past";
   const isCurrent = item.status === "current";
@@ -316,6 +389,11 @@ export function AgendaRow({
       </span>
       <span className="shrink-0 text-(--app-text-muted)">{item.author}</span>
       <span className="min-w-0 flex-1 truncate text-(--app-text-mid)">{item.subject}</span>
+      {showCategory && CATEGORY_LABEL[item.category] && (
+        <span className="shrink-0 font-sans text-[0.68rem] text-(--app-text-subtle)">
+          {CATEGORY_LABEL[item.category]}
+        </span>
+      )}
     </div>
   );
 }

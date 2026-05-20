@@ -147,7 +147,7 @@ export function LegislatorDetail({ id }: { id: number }) {
         <>
           <div className="mt-7 mb-3 flex items-center gap-3">
             <span className="text-[0.75rem] font-semibold uppercase tracking-widest text-(--app-text-muted)">
-              Upcoming Votes
+              Floor Agenda
             </span>
             <div className="flex-1 border-t border-(--app-border-light)" />
           </div>

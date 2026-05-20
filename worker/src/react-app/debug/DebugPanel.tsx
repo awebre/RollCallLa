@@ -3,6 +3,18 @@ import { useAdmin } from "../AdminContext";
 import { useDebug } from "./DebugContext";
 import { DEBUG_FEATURES } from "./fixtures/index";
 
+type ActionState = "idle" | "running" | "ok" | "err";
+
+function useAction(fn: () => Promise<void>) {
+  const [state, setState] = useState<ActionState>("idle");
+  const run = async () => {
+    setState("running");
+    try { await fn(); setState("ok"); } catch { setState("err"); }
+    setTimeout(() => setState("idle"), 2000);
+  };
+  return { state, run };
+}
+
 function BugIcon() {
   return (
     <svg
@@ -33,6 +45,27 @@ function BugIcon() {
       <line x1="16" y1="14" x2="19" y2="14" />
       <line x1="16" y1="16" x2="19" y2="17.5" />
     </svg>
+  );
+}
+
+function ClearCacheButton() {
+  const { state, run } = useAction(() =>
+    fetch("/api/admin/agenda-cache", { method: "DELETE" }).then((r) => {
+      if (!r.ok) throw new Error("failed");
+    })
+  );
+  const label =
+    state === "running" ? "Clearing…" :
+    state === "ok"      ? "✓ Cleared" :
+    state === "err"     ? "✗ Failed"  : "Clear agenda cache";
+  return (
+    <button
+      onClick={run}
+      disabled={state === "running"}
+      className="w-full cursor-pointer border border-(--app-border-input) bg-(--app-surface) px-2 py-1.5 text-left text-[0.8rem] text-(--app-ink) hover:bg-(--app-surface-warm) disabled:opacity-50"
+    >
+      {label}
+    </button>
   );
 }
 
@@ -96,6 +129,12 @@ export function DebugPanel() {
                 </select>
               </div>
             ))}
+          </div>
+          <div className="border-t border-(--app-border-light) p-3 space-y-1">
+            <label className="block text-[0.72rem] font-semibold uppercase tracking-wide text-(--app-text-muted) mb-1">
+              Actions
+            </label>
+            <ClearCacheButton />
           </div>
           <div className="border-t border-(--app-border-light) px-3 py-1.5 text-[0.68rem] text-(--app-text-subtle)">
             Overrides stored in sessionStorage. Admin only.

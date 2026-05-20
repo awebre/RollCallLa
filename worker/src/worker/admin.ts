@@ -264,6 +264,23 @@ admin.post('/logout', () => {
 
 const VALID_STATUSES = new Set(['new', 'in_progress', 'addressed', 'dismissed']);
 
+admin.get('/feedback/counts', async (c) => {
+    const sessionRes = await requireSession(
+        { req: { raw: c.req.raw }, env: c.env },
+        async () => Response.json({ ok: true }),
+    );
+    if (!sessionRes.ok) return sessionRes;
+
+    const db = c.env.la_vote_tracker;
+    const { results } = await db.prepare(
+        `SELECT status, COUNT(*) as count FROM feedback GROUP BY status`,
+    ).all<{ status: string; count: number }>();
+
+    const counts: Record<string, number> = {};
+    for (const row of results) counts[row.status] = row.count;
+    return c.json(counts);
+});
+
 admin.get('/feedback', async (c) => {
     const sessionRes = await requireSession(
         { req: { raw: c.req.raw }, env: c.env },
@@ -284,6 +301,24 @@ admin.get('/feedback', async (c) => {
     ).bind(limit, offset).all();
 
     return c.json({ feedback: results, limit, offset });
+});
+
+admin.delete('/agenda-cache', async (c) => {
+    const sessionRes = await requireSession(
+        { req: { raw: c.req.raw }, env: c.env },
+        async () => Response.json({ ok: true }),
+    );
+    if (!sessionRes.ok) return sessionRes;
+
+    const cache = caches.default;
+    const results = await Promise.all(
+        (['H', 'S'] as const).map(async (chamber) => {
+            const key = `https://rollcall.la/__cache/agenda/${chamber}`;
+            const deleted = await cache.delete(key);
+            return { chamber, deleted };
+        }),
+    );
+    return c.json({ ok: true, results });
 });
 
 admin.patch('/feedback/:id', async (c) => {

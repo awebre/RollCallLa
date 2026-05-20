@@ -9,6 +9,14 @@
  * legislator in the same chamber shares one upstream fetch per cache window.
  */
 
+export type AgendaCategory =
+    | 'final_passage'   // Third Reading and Final Passage / Final Consideration
+    | 'concurrence'     // Concurrence votes and conference committee reports
+    | 'second_reading'  // Second reading — referred to committee, no floor vote
+    | 'introduction'    // Introduction of bills / resolutions
+    | 'deferred'        // Lying over / postponed
+    | 'other';
+
 export type AgendaItem = {
     /** Normalised bill number, e.g. "HB 255" */
     bill_number: string;
@@ -18,6 +26,8 @@ export type AgendaItem = {
     subject: string;
     /** Status derived from CSS class on the row */
     status: 'future' | 'current' | 'past';
+    /** Category derived from the agenda section header */
+    category: AgendaCategory;
 };
 
 export type AgendaResult = {
@@ -26,6 +36,10 @@ export type AgendaResult = {
     time: string | null;
     location: string | null;
     items: AgendaItem[];
+    /** true when the floor session is actively in progress (hideMeetingStatus = 2) */
+    in_progress: boolean;
+    /** true when the floor session has adjourned for the day (hideMeetingStatus = -2) */
+    adjourned: boolean;
     /** ISO timestamp of when this data was fetched */
     fetched_at: string;
     /** true when the agenda page was reachable and parseable */
@@ -33,12 +47,28 @@ export type AgendaResult = {
     error?: string;
 };
 
-const CACHE_TTL_SECONDS = 5 * 60; // 5 minutes
+const CACHE_TTL_LIVE_SECONDS  =       60; // 1 minute  — session in progress
+const CACHE_TTL_IDLE_SECONDS  = 30 * 60; // 30 minutes — no active session
 const UPSTREAM_TIMEOUT_MS = 8_000;
 
 /** Normalise "HB255" → "HB 255", "SB12" → "SB 12", etc. */
 function normaliseBillNumber(raw: string): string {
     return raw.trim().replace(/^([A-Z]+)(\d+)$/, '$1 $2');
+}
+
+/** Map a raw agenda section header to a normalised category. */
+function categoriseSection(header: string): AgendaCategory {
+    const h = header.toLowerCase();
+    // "Final Passage" (House) and "Final Passage" (Senate) both contain this phrase.
+    // "to be Adopted" catches Senate resolution final consideration sections.
+    if (h.includes('final passage') || h.includes('final consideration') || h.includes('to be adopted')) return 'final_passage';
+    // "Returned from" covers Senate concurrence sections; "concur" and "conference" cover the rest.
+    if (h.includes('concur') || h.includes('conference') || h.includes('returned from')) return 'concurrence';
+    // Senate uses "2nd Reading"; House uses "Second Reading". Both need to match.
+    if (h.includes('second reading') || h.includes('2nd reading') || h.includes('reported by committee')) return 'second_reading';
+    if (h.includes('introduction')) return 'introduction';
+    if (h.includes('lying over')) return 'deferred';
+    return 'other';
 }
 
 /**
@@ -59,21 +89,57 @@ function parseAgendaText(html: string): {
     const time = extract('lTime');
     const location = extract('lLocation');
 
+    // hideMeetingStatus: 2 = in progress, -2 = adjourned, other = not yet started.
+    const meetingStatusMatch = html.match(/hideMeetingStatus[^>]*value="(-?\d+)"/);
+    const meetingStatus = meetingStatusMatch ? Number(meetingStatusMatch[1]) : 0;
+    const in_progress = meetingStatus === 2;
+    const adjourned   = meetingStatus === -2;
+
     const items: AgendaItem[] = [];
 
     // Find the agenda table
     const tableStart = html.indexOf('id="TableAgendaItems"');
-    if (tableStart === -1) return { date, time, location, items };
-    const tableEnd = html.indexOf('</table>', tableStart);
+    if (tableStart === -1) return { date, time, location, in_progress, adjourned, items };
+
+    // The table contains ~50 nested <table> elements, so the first </table> after
+    // tableStart closes an inner table, not the outer one. Walk forward tracking
+    // nesting depth to find the real closing tag for TableAgendaItems.
+    let tableEnd = -1;
+    let depth = 0;
+    const tagPattern = /<\/?table/gi;
+    tagPattern.lastIndex = tableStart;
+    let tagMatch: RegExpExecArray | null;
+    while ((tagMatch = tagPattern.exec(html)) !== null) {
+        if (tagMatch[0].startsWith('</')) {
+            if (depth === 0) { tableEnd = tagMatch.index; break; }
+            depth--;
+        } else {
+            depth++;
+        }
+    }
     const tableHtml = html.slice(tableStart, tableEnd === -1 ? undefined : tableEnd + 8);
 
     // Match each <tr>...</tr> block
     const trPattern = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
     let trMatch: RegExpExecArray | null;
+    let currentCategory: AgendaCategory = 'other';
 
     while ((trMatch = trPattern.exec(tableHtml)) !== null) {
         const rowHtml = trMatch[0];
         const rowContent = trMatch[1];
+
+        // Section header rows have a single colspan="5" cell with the section title.
+        const headerMatch = rowContent.match(/colspan="5"[^>]*>([\s\S]*?)<\/td>/i);
+        if (headerMatch) {
+            const headerText = headerMatch[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+            // "Scheduled for…" and "Not yet scheduled…" rows are scheduling annotations,
+            // not new sections — skip them so the category set by the real section header
+            // above is preserved for all bills within that section.
+            if (headerText && !/^(scheduled|not yet scheduled)/i.test(headerText)) {
+                currentCategory = categoriseSection(headerText);
+            }
+            continue;
+        }
 
         // Determine status from CSS class on any element in the row
         let status: AgendaItem['status'] = 'future';
@@ -106,11 +172,12 @@ function parseAgendaText(html: string): {
                 author: cells[3],
                 subject: cells[4],
                 status,
+                category: currentCategory,
             });
         }
     }
 
-    return { date, time, location, items };
+    return { date, time, location, in_progress, adjourned, items };
 }
 
 export async function fetchChamberAgenda(
@@ -161,24 +228,29 @@ export async function fetchChamberAgenda(
         clearTimeout(timeout);
     }
 
-    const { date, time, location, items } = parseAgendaText(html);
+    const { date, time, location, in_progress, adjourned, items } = parseAgendaText(html);
 
     const result: AgendaResult = {
         chamber,
         date,
         time,
         location,
+        in_progress,
+        adjourned,
         items,
         fetched_at: new Date().toISOString(),
         ok: true,
     };
 
+    // Use a shorter TTL when the session is actively in progress.
+    const ttl = result.in_progress ? CACHE_TTL_LIVE_SECONDS : CACHE_TTL_IDLE_SECONDS;
+
     // Store in edge cache with manual expires_at for local dev compatibility.
-    const payload = { ...result, expires_at: Date.now() + CACHE_TTL_SECONDS * 1000 };
+    const payload = { ...result, expires_at: Date.now() + ttl * 1000 };
     const cacheResponse = new Response(JSON.stringify(payload), {
         headers: {
             'Content-Type': 'application/json',
-            'Cache-Control': `public, max-age=${CACHE_TTL_SECONDS}`,
+            'Cache-Control': `public, max-age=${ttl}`,
         },
     });
     await cache.put(cacheKey, cacheResponse);
