@@ -51,9 +51,9 @@ const CACHE_TTL_LIVE_SECONDS  =       60; // 1 minute  — session in progress
 const CACHE_TTL_IDLE_SECONDS  = 30 * 60; // 30 minutes — no active session
 const UPSTREAM_TIMEOUT_MS = 8_000;
 
-/** Normalise "HB255" → "HB 255", "SB12" → "SB 12", etc. */
+/** Normalise "HB 255" → "HB255", "SB 12" → "SB12", etc. */
 function normaliseBillNumber(raw: string): string {
-    return raw.trim().replace(/^([A-Z]+)(\d+)$/, '$1 $2');
+    return raw.trim().replace(/\s+/g, '');
 }
 
 /** Map a raw agenda section header to a normalised category. */
