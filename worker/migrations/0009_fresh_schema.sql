@@ -50,6 +50,8 @@ CREATE TABLE legislators (
     source_id   INTEGER,                                          -- NULL for pdf-only
     last_name   TEXT    NOT NULL,
     first_name  TEXT,
+    suffix      TEXT,                                             -- 'Jr.', 'III', etc.
+    nickname    TEXT,                                             -- '"Beau"', etc.
     party       TEXT    CHECK(party IN ('R','D','I')),
     district    INTEGER,
     source      TEXT    NOT NULL DEFAULT 'roster'

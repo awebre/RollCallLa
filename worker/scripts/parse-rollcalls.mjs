@@ -252,13 +252,18 @@ function lookupMember(name, chamber, rollCallDate) {
 }
 
 // ── output SQL emission ──────────────────────────────────────────────────────
-const syntheticInserts = [];   // new pdf-only legislators to create
+const syntheticInserts = [];        // new pdf-only legislators to create
+const sessionMembershipInserts = []; // pdf-only legislator_sessions backfill
 // chamber → normKey → canonical last_name (the form stored in DB). Seeded from
 // the existing pdf-only legislators and extended whenever we queue a new one.
 // Needed because PDFs cap-fold names inconsistently ("DeVillier" vs "DEVILLIER")
 // and the SELECT lookup must use the exact stored form.
 const pdfCanonical = { H: new Map(), S: new Map() };
 for (const l of pdfOnlyRaw) pdfCanonical[l.chamber].set(norm(l.last_name), l.last_name);
+// Track which pdf-only legislators we've already queued session membership for
+// this run. Idempotent on disk via UNIQUE(legislator_id, session_name) on the
+// junction, but skipping the duplicate work keeps the SQL output small.
+const pdfMembershipQueued = new Set();
 const rcChunks = [];           // roll_calls + votes inserts
 const stats = { roll_calls: 0, votes: 0, unmatched: new Map(), synthetic_new: 0, skipped: 0 };
 
@@ -270,6 +275,23 @@ function queueSynthetic(chamber, displayName, normKey) {
         `INSERT INTO legislators (chamber, last_name, source) VALUES (${escSql(chamber)}, ${escSql(cleanLast)}, 'pdf') ON CONFLICT (chamber, last_name) WHERE source='pdf' DO NOTHING;`,
     );
     stats.synthetic_new++;
+}
+
+// Backfill legislator_sessions for pdf-only legislators that voted in this session.
+// Roster members get their session membership from scrape-rosters; this only fires
+// for unmatched names that got minted as pdf-only synthetics. active=0 marks them
+// as not-currently-serving for the session (they wouldn't be a synthetic otherwise).
+function queuePdfMembership(chamber, normKey) {
+    const memKey = `${chamber}:${normKey}`;
+    if (pdfMembershipQueued.has(memKey)) return;
+    pdfMembershipQueued.add(memKey);
+    const canonical = pdfCanonical[chamber].get(normKey);
+    if (!canonical) return; // should not happen — queueSynthetic always sets it first
+    const legislatorIdExpr = `(SELECT id FROM legislators WHERE chamber=${escSql(chamber)} AND last_name=${escSql(canonical)} AND source='pdf')`;
+    const sessionIdExpr    = `(SELECT id FROM sessions WHERE name=${escSql(SESSION)})`;
+    sessionMembershipInserts.push(
+        `INSERT INTO legislator_sessions (legislator_id, session_id, session_name, role, active) VALUES (${legislatorIdExpr}, ${sessionIdExpr}, ${escSql(SESSION)}, ${escSql(chamber === 'S' ? 'Sen' : 'Rep')}, 0) ON CONFLICT(legislator_id, session_name) DO NOTHING;`,
+    );
 }
 
 // Subquery that resolves a legislator surrogate id from the source-system natural key.
@@ -350,7 +372,9 @@ for (const bill of billsRaw) {
                 if (!member) {
                     stats.unmatched.set(name, (stats.unmatched.get(name) || 0) + 1);
                     const cleanLast = name.replace(/,\s*[A-Za-z]\.?\s*$/, '').trim();
-                    queueSynthetic(pdfRow.chamber, name, norm(cleanLast));
+                    const normKey  = norm(cleanLast);
+                    queueSynthetic(pdfRow.chamber, name, normKey);
+                    queuePdfMembership(pdfRow.chamber, normKey);
                 }
                 voters.push({
                     chamber: pdfRow.chamber,
@@ -392,7 +416,10 @@ const out = [
     `-- parse-rollcalls output for session ${SESSION}`,
     `-- ${new Date().toISOString()}`,
     `BEGIN TRANSACTION;`,
-    ...syntheticInserts,   // pdf-only legislators first (roll_calls/votes reference them)
+    // pdf-only legislator rows must be inserted before any session memberships
+    // or votes that reference them via the (chamber, last_name) subquery.
+    ...syntheticInserts,
+    ...sessionMembershipInserts,
     ...rcChunks,
     `COMMIT;`,
 ].join('\n');
