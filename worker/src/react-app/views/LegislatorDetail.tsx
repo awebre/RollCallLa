@@ -108,7 +108,7 @@ export function LegislatorDetail({ id }: { id: number }) {
         <Stat
           label="Party-line"
           value={party_line == null ? "—" : `${party_line}%`}
-          help="Percentage of final passage votes where this legislator voted the same way as the majority of their party colleagues in the same chamber."
+          help="Percentage of final passage votes where this legislator voted with their party's majority position in the same chamber (Yea if most colleagues voted Yea, Nay if most voted Nay)."
         />
       </section>
       <p className="text-[0.82rem] text-(--app-text-muted)">

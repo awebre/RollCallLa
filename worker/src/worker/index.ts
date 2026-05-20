@@ -168,28 +168,36 @@ app.get('/api/legislators/:id', async (c) => {
              WHERE v.people_id = ? AND rc.vote_category = 'final_passage' ${sessionClause}
              GROUP BY vote`,
         ).bind(...sessionBindsFor([id])),
-        // For each roll call, % of same-party members who took the same position.
-        // Used to surface "party-line" tendency in the summary card.
+        // Party Unity Score (standard CQ/GovTrack method):
+        // for each final-passage roll call, determine the party's majority position
+        // (whichever of Yea/Nay got more same-party same-chamber votes), then check
+        // whether this legislator voted with that majority. Score = aligned / total.
         db.prepare(
             `WITH legi AS (
                 SELECT party, role FROM legislators WHERE people_id = ?
              ),
-             same_party_votes AS (
-                SELECT v.roll_call_id, v.vote, v2.vote AS other_vote
-                FROM votes v
-                JOIN roll_calls rc ON rc.roll_call_id = v.roll_call_id
-                JOIN bills b       ON b.bill_id      = rc.bill_id
-                JOIN votes v2 ON v2.roll_call_id = v.roll_call_id AND v2.people_id != v.people_id
+             party_majority AS (
+                SELECT
+                    v2.roll_call_id,
+                    CASE WHEN SUM(CASE WHEN v2.vote = 1 THEN 1 ELSE 0 END) >=
+                              SUM(CASE WHEN v2.vote = 2 THEN 1 ELSE 0 END)
+                         THEN 1 ELSE 2 END AS majority_vote
+                FROM votes v2
                 JOIN legislators l2 ON l2.people_id = v2.people_id
                 JOIN legi ON legi.party = l2.party AND legi.role = l2.role
-                WHERE v.people_id = ? AND rc.vote_category = 'final_passage'
-                  AND v.vote IN (1, 2) ${sessionClause}
+                JOIN roll_calls rc ON rc.roll_call_id = v2.roll_call_id
+                JOIN bills b       ON b.bill_id      = rc.bill_id
+                WHERE v2.vote IN (1, 2) AND rc.vote_category = 'final_passage'
+                  ${sessionClause}
+                GROUP BY v2.roll_call_id
              )
              SELECT
-                COUNT(*) FILTER (WHERE vote = other_vote) AS aligned,
+                COUNT(*) FILTER (WHERE v.vote = pm.majority_vote) AS aligned,
                 COUNT(*) AS total
-             FROM same_party_votes`,
-        ).bind(...sessionBindsFor([id, id])),
+             FROM votes v
+             JOIN party_majority pm ON pm.roll_call_id = v.roll_call_id
+             WHERE v.people_id = ? AND v.vote IN (1, 2)`,
+        ).bind(...(sessionId ? [id, sessionId, id] : [id, id])),
     ]);
 
     if (profile.results.length === 0) return c.json({ error: 'not found' }, 404);
