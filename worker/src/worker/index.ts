@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { admin } from './admin';
+import { fetchChamberAgenda } from './agenda';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -321,6 +322,14 @@ app.get('/api/rollcalls/:id', async (c) => {
     if (head.results.length === 0) return c.json({ error: 'not found' }, 404);
     c.header('cache-control', CACHE);
     return c.json({ roll_call: head.results[0], members: members.results });
+});
+
+app.get('/api/agenda/:chamber', async (c) => {
+    const raw = c.req.param('chamber').toUpperCase();
+    if (raw !== 'H' && raw !== 'S') return c.json({ error: 'chamber must be H or S' }, 400);
+    const result = await fetchChamberAgenda(raw, caches);
+    // Don't cache the Worker response itself — the agenda module manages cache internally.
+    return c.json(result);
 });
 
 const CATEGORY_LABELS: Record<string, string> = {

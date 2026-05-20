@@ -1,14 +1,18 @@
 import { useEffect } from 'react';
-import { Switch, Route, Link, useLocation } from 'wouter';
+import { Switch, Route, Link, Redirect, useLocation } from 'wouter';
 import { Roster } from './views/Roster';
 import { LegislatorDetail } from './views/LegislatorDetail';
 import { RollCallDetail } from './views/RollCallDetail';
 import { DistrictMap } from './views/Map';
 import { AdminView } from './views/Admin';
+import { AgendaView } from './views/AgendaView';
 import { Status } from './components/Status';
 import { SessionPicker } from './components/SessionPicker';
 import { SessionProvider, useSession } from './SessionContext';
 import { FeedbackProvider, useFeedback } from './FeedbackContext';
+import { AdminProvider, useAdmin } from './AdminContext';
+import { DebugProvider } from './debug/DebugContext';
+import { DebugPanel } from './debug/DebugPanel';
 
 const GEO_BASE = import.meta.env.VITE_GEO_BASE_URL ?? '/geo';
 
@@ -26,7 +30,8 @@ function GeoPrefetch() {
 
 function Shell() {
     const [location] = useLocation();
-    const path = location.split('/')[1] ?? '';
+    const path    = location.split('/')[1] ?? '';
+    const subpath = location.split('/')[2] ?? '';
 
     return (
         <SessionProvider>
@@ -48,20 +53,34 @@ function Shell() {
                         <Status />
                     </header>
                     <nav className="mb-5 flex gap-5 text-[0.95rem]">
-                        <Link href="/" className={navLinkClass(path === '')}>Roster</Link>
-                        <Link href="/map" className={navLinkClass(path === 'map')}>District Map</Link>
+                        <Link href="/" className={navLinkClass(path === '' || path === 'map')}>District Map</Link>
+                        <Link href="/roster" className={navLinkClass(path === 'roster' || path === 'legislator')}>Roster</Link>
+                        <Link href="/agenda/H" className={navLinkClass(path === 'agenda')}>
+                            Agenda{path === 'agenda' && subpath ? ` · ${subpath === 'H' ? 'House' : 'Senate'}` : ''}
+                        </Link>
+                        <AdminNavLink path={path} />
                     </nav>
 
                     <Switch>
-                        <Route path="/" component={Roster} />
+                        <Route path="/"><Redirect to="/map" /></Route>
                         <Route path="/map" component={DistrictMap} />
+                        <Route path="/roster" component={Roster} />
                         <Route path="/legislator/:id">
                             {(params) => <LegislatorDetail id={Number(params.id)} />}
                         </Route>
                         <Route path="/rollcall/:id">
                             {(params) => <RollCallDetail id={Number(params.id)} />}
                         </Route>
-                        <Route component={Roster} />
+                        <Route path="/agenda/:chamber">
+                            {(params) => {
+                                const c = params.chamber?.toUpperCase();
+                                return (c === 'H' || c === 'S')
+                                    ? <AgendaView chamber={c} />
+                                    : <AgendaView chamber="H" />;
+                            }}
+                        </Route>
+                        <Route path="/agenda" component={() => <AgendaView chamber="H" />} />
+                        <Route><Redirect to="/map" /></Route>
                     </Switch>
                 </main>
                 <footer className="box-border mx-auto w-full max-w-260 px-4 pb-8 font-serif text-(--app-subtitle) text-sm border-t border-(--app-ink)/20 pt-4">
@@ -72,18 +91,33 @@ function Shell() {
     );
 }
 
+function AdminNavLink({ path }: { path: string }) {
+    const { isAdmin } = useAdmin();
+    if (!isAdmin) return null;
+    return (
+        <Link href="/admin" className={`ml-auto ${navLinkClass(path === 'admin')}`}>
+            Admin
+        </Link>
+    );
+}
+
 function App() {
     return (
-        <Switch>
-            <Route path="/admin">
-                <main className="box-border mx-auto w-full max-w-200 px-4 pt-8 pb-16 font-serif text-(--app-ink)">
-                    <AdminView />
-                </main>
-            </Route>
-            <Route>
-                <Shell />
-            </Route>
-        </Switch>
+        <AdminProvider>
+            <DebugProvider>
+                <Switch>
+                    <Route path="/admin">
+                        <main className="box-border mx-auto w-full max-w-200 px-4 pt-8 pb-16 font-serif text-(--app-ink)">
+                            <AdminView />
+                        </main>
+                    </Route>
+                    <Route>
+                        <Shell />
+                    </Route>
+                </Switch>
+                <DebugPanel />
+            </DebugProvider>
+        </AdminProvider>
     );
 }
 
