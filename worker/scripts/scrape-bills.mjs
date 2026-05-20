@@ -118,18 +118,28 @@ function decode(s) {
 
 /**
  * Best-effort classifier for LabelCurrentStatus into our pipeline_stage vocabulary.
- * Patterns are tuned to legis.la.gov's status phrasing — extend as new variants
- * are observed. Order matters: most-specific patterns come first.
+ *
+ * Tuned against real 24RS status text. Sample patterns observed:
+ *   "Signed by the Governor - Act 4"          → enacted (bills)
+ *   "Sent to the Secretary of State"           → enacted (resolutions: HCR/HR/SR/etc)
+ *   "Pending House Appropriations"             → committee
+ *   "Pending Senate and Governmental Affairs"  → committee
+ *   "Subject to call - Senate final passage"   → floor
+ *
+ * Order matters — most-specific patterns first. Extend as new variants surface
+ * in active sessions (introduction, concurrence, governor-pending all expected
+ * once 26RS is scraped live).
  */
 function categoriseStatus(statusText, originatingChamber) {
     if (!statusText) return { stage: 'introduced', next_chamber: null };
     const t = statusText.toLowerCase();
 
-    // Enacted / signed into law
-    if (/\bact\s+no\.?\s*\d|\beffective\b|\bsigned\s+by\s+(the\s+)?governor\b|\bbecame\s+law\b/.test(t)) {
+    // Enacted: bills signed by governor, resolutions filed with Secretary of State,
+    // or any text mentioning an Act number / effective date / "became law".
+    if (/signed\s+by\s+(the\s+)?governor|sent\s+to\s+the\s+secretary\s+of\s+state|\bact\s+(?:no\.?\s*)?\d|\beffective\b|\bbecame\s+law\b/.test(t)) {
         return { stage: 'enacted', next_chamber: null };
     }
-    // On governor's desk
+    // On governor's desk (sent but not yet signed)
     if (/sent\s+to\s+(the\s+)?governor|on\s+governor'?s?\s+desk|delivered\s+to\s+(the\s+)?governor/.test(t)) {
         return { stage: 'governor', next_chamber: null };
     }
@@ -141,14 +151,24 @@ function categoriseStatus(statusText, originatingChamber) {
     if (/concurrence|returned\s+from\s+(house|senate)|conference\s+committee|amendments\s+rejected/.test(t)) {
         return { stage: 'concurrence', next_chamber: originatingChamber };
     }
-    // Floor activity (second/third reading, final passage, on calendar)
-    if (/(?:pending|on)\s+(house|senate)\s+(?:floor|final\s+passage|third\s+reading|second\s+reading|calendar)|read\s+by\s+title|passed\s+by\s+(?:the\s+)?(house|senate)/.test(t)) {
-        const m = t.match(/(?:pending|on|passed\s+by\s+(?:the\s+)?)(house|senate)/);
+    // Floor activity (final passage, readings, calendar, "subject to call").
+    // Match floor keywords first so "Pending House final passage" doesn't fall through to committee.
+    if (
+        /(?:pending|on|subject\s+to\s+call(?:\s*[-:]?\s*)?)\s*(?:house|senate)?\s+(?:floor|final\s+passage|third\s+reading|second\s+reading|calendar)/.test(t) ||
+        /passed\s+by\s+(?:the\s+)?(?:house|senate)/.test(t) ||
+        /\bread\s+by\s+title\b/.test(t)
+    ) {
+        const m = t.match(/(house|senate)/);
         return { stage: 'floor', next_chamber: m ? (m[1] === 'house' ? 'H' : 'S') : null };
     }
-    // Committee
-    if (/(?:pending|in|referred\s+to|reported\s+by|heard\s+by)\s+(?:the\s+)?(?:house|senate)?\s*committee|sent\s+to\s+committee/.test(t)) {
-        const m = t.match(/(house|senate)\s+committee/);
+    // Committee — "Pending <chamber> <committee-name>" or explicit committee verbs.
+    // The chamber name is followed by a committee name (any non-whitespace), not a
+    // floor keyword (those were caught above).
+    if (
+        /pending\s+(house|senate)\s+\S/.test(t) ||
+        /(?:referred\s+to|reported\s+by|heard\s+by)\s+(?:the\s+)?(?:house|senate)?\s*committee/.test(t)
+    ) {
+        const m = t.match(/pending\s+(house|senate)/);
         return { stage: 'committee', next_chamber: m ? (m[1] === 'house' ? 'H' : 'S') : null };
     }
     // Introduced

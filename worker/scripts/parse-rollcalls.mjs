@@ -100,12 +100,6 @@ for (const l of rosterRaw) {
     byChamberLast[l.chamber].get(key).push(l);
 }
 
-// chamber → normalized last name → existing pdf-only legislator row
-const pdfOnlyByKey = { H: new Map(), S: new Map() };
-for (const l of pdfOnlyRaw) {
-    pdfOnlyByKey[l.chamber].set(norm(l.last_name), l);
-}
-
 const sortedLasts = {
     H: [...byChamberLast.H.keys()].sort((a, b) => b.length - a.length),
     S: [...byChamberLast.S.keys()].sort((a, b) => b.length - a.length),
@@ -259,15 +253,19 @@ function lookupMember(name, chamber, rollCallDate) {
 
 // ── output SQL emission ──────────────────────────────────────────────────────
 const syntheticInserts = [];   // new pdf-only legislators to create
-const seenSynthetic = new Set(); // chamber:normLast keys queued this run
+// chamber → normKey → canonical last_name (the form stored in DB). Seeded from
+// the existing pdf-only legislators and extended whenever we queue a new one.
+// Needed because PDFs cap-fold names inconsistently ("DeVillier" vs "DEVILLIER")
+// and the SELECT lookup must use the exact stored form.
+const pdfCanonical = { H: new Map(), S: new Map() };
+for (const l of pdfOnlyRaw) pdfCanonical[l.chamber].set(norm(l.last_name), l.last_name);
 const rcChunks = [];           // roll_calls + votes inserts
 const stats = { roll_calls: 0, votes: 0, unmatched: new Map(), synthetic_new: 0, skipped: 0 };
 
 function queueSynthetic(chamber, displayName, normKey) {
-    if (pdfOnlyByKey[chamber].has(normKey)) return; // already exists in DB
-    if (seenSynthetic.has(`${chamber}:${normKey}`)) return; // already queued
-    seenSynthetic.add(`${chamber}:${normKey}`);
+    if (pdfCanonical[chamber].has(normKey)) return; // already known (stored or queued)
     const cleanLast = displayName.replace(/,\s*[A-Za-z]\.?\s*$/, '').trim();
+    pdfCanonical[chamber].set(normKey, cleanLast);
     syntheticInserts.push(
         `INSERT INTO legislators (chamber, last_name, source) VALUES (${escSql(chamber)}, ${escSql(cleanLast)}, 'pdf') ON CONFLICT (chamber, last_name) WHERE source='pdf' DO NOTHING;`,
     );
@@ -275,13 +273,16 @@ function queueSynthetic(chamber, displayName, normKey) {
 }
 
 // Subquery that resolves a legislator surrogate id from the source-system natural key.
-// roster: by (chamber, source_id). pdf-only: by (chamber, last_name) where source='pdf'.
+// roster: by (chamber, source_id). pdf-only: by (chamber, canonical last_name) where source='pdf'.
 function legislatorIdExpr(member, chamber, displayName) {
     if (member) {
         return `(SELECT id FROM legislators WHERE chamber=${escSql(chamber)} AND source_id=${member.source_id})`;
     }
     const cleanLast = displayName.replace(/,\s*[A-Za-z]\.?\s*$/, '').trim();
-    return `(SELECT id FROM legislators WHERE chamber=${escSql(chamber)} AND last_name=${escSql(cleanLast)} AND source='pdf')`;
+    // Resolve to the canonical stored form so casing/diacritic variants in the
+    // PDF all map to the one DB row queued for that (chamber, normKey).
+    const canonical = pdfCanonical[chamber].get(norm(cleanLast)) ?? cleanLast;
+    return `(SELECT id FROM legislators WHERE chamber=${escSql(chamber)} AND last_name=${escSql(canonical)} AND source='pdf')`;
 }
 
 function rollCallIdExpr(chamber, rcNumber) {
