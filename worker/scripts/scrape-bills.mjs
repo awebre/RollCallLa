@@ -210,7 +210,7 @@ const stats = {
 const sqlChunks = [];
 sqlChunks.push(`-- Scraped from legis.la.gov for session ${SESSION}`);
 sqlChunks.push(`-- ${new Date().toISOString()}`);
-sqlChunks.push(`BEGIN TRANSACTION;`);
+sqlChunks.push(`-- D1 remote rejects BEGIN/COMMIT; each statement runs in its own transaction`);
 
 // ── session upsert ────────────────────────────────────────────────────────────
 const sessionParsed = parseSession(SESSION);
@@ -268,7 +268,7 @@ for (const { code, chamber } of types) {
     console.error(`${code}: scanned 1..${num - misses}, ${stats.bills_seen} bills total so far`);
 }
 
-sqlChunks.push(`COMMIT;`);
+sqlChunks.push(`-- end batch`);
 
 writeFileSync(OUT_PATH, sqlChunks.join('\n'));
 console.error(`Wrote ${OUT_PATH}`);
