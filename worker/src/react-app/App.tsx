@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Switch, Route, Link, Redirect, useLocation, useRoute } from 'wouter';
+import { Switch, Route, Link, Redirect, useRoute } from 'wouter';
 import { Roster } from './views/Roster';
 import { LegislatorDetail } from './views/LegislatorDetail';
 import { RollCallDetail } from './views/RollCallDetail';

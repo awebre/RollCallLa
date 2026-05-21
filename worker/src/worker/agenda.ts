@@ -78,6 +78,8 @@ function parseAgendaText(html: string): {
     date: string | null;
     time: string | null;
     location: string | null;
+    in_progress: boolean;
+    adjourned: boolean;
     items: AgendaItem[];
 } {
     const extract = (id: string): string | null => {
@@ -219,6 +221,8 @@ export async function fetchChamberAgenda(
             date: null,
             time: null,
             location: null,
+            in_progress: false,
+            adjourned: false,
             items: [],
             fetched_at: new Date().toISOString(),
             ok: false,
