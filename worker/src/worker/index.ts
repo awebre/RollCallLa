@@ -148,6 +148,75 @@ app.get('/api/legislators', async (c) => {
     return c.json({ legislators: results, session_id: sessionId });
 });
 
+// ── bills list ──────────────────────────────────────────────────────────────
+// Returns bills scoped to a session with the filters the UI exposes. No joins
+// to roll_calls/votes — pure metadata view that's cheap and fast.
+app.get('/api/bills', async (c) => {
+    const db = c.env.la_vote_tracker;
+    const { chamber, type, stage, next_chamber, q, session_id, limit: limitStr, offset: offsetStr } = c.req.query();
+    let sessionId = Number(session_id) || null;
+
+    // Default to most-recent session if not supplied.
+    if (sessionId === null) {
+        const latest = await db.prepare(
+            `SELECT id FROM sessions ORDER BY year DESC, id DESC LIMIT 1`,
+        ).first<{ id: number }>();
+        sessionId = latest?.id ?? null;
+    }
+
+    const where: string[] = ['session_id = ?'];
+    const binds: (string | number)[] = [sessionId ?? 0];
+    if (chamber === 'H' || chamber === 'S') {
+        where.push('originating_chamber = ?');
+        binds.push(chamber);
+    }
+    if (type) {
+        where.push('bill_type = ?');
+        binds.push(type.toUpperCase());
+    }
+    if (stage) {
+        where.push('pipeline_stage = ?');
+        binds.push(stage);
+    }
+    if (next_chamber === 'H' || next_chamber === 'S') {
+        where.push('next_chamber = ?');
+        binds.push(next_chamber);
+    }
+    if (q) {
+        where.push('(bill_number LIKE ? OR title LIKE ?)');
+        const like = `%${q}%`;
+        binds.push(like, like);
+    }
+
+    const limit = Math.min(Number(limitStr) || 50, 200);
+    const offset = Math.max(Number(offsetStr) || 0, 0);
+
+    // Use a CTE to share the WHERE clause for the total count and the page.
+    // Bill ordering by chamber-then-number sorts HBs together then SBs etc.;
+    // the secondary CAST sorts numerically inside the type so HB2 comes before HB10.
+    const sql = `
+        SELECT id, bill_number, bill_type, originating_chamber, title,
+               pipeline_stage, next_chamber, status_text, docs_id
+        FROM bills
+        WHERE ${where.join(' AND ')}
+        ORDER BY bill_type, CAST(SUBSTR(bill_number, LENGTH(bill_type) + 1) AS INTEGER)
+        LIMIT ? OFFSET ?
+    `;
+    const countSql = `SELECT COUNT(*) AS n FROM bills WHERE ${where.join(' AND ')}`;
+    const [page, total] = await db.batch([
+        db.prepare(sql).bind(...binds, limit, offset),
+        db.prepare(countSql).bind(...binds),
+    ]);
+    c.header('cache-control', CACHE);
+    return c.json({
+        bills: page.results,
+        total: (total.results[0] as { n: number }).n,
+        limit,
+        offset,
+        session_id: sessionId,
+    });
+});
+
 // ── legislator detail ───────────────────────────────────────────────────────
 app.get('/api/legislators/:id', async (c) => {
     const db = c.env.la_vote_tracker;
