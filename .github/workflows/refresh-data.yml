@@ -48,20 +48,12 @@ jobs:
 
       - run: npm ci
 
-      # Cache only the immutable parts: PDFs (~300 MB, never change once published)
-      # and votes-page HTML (append-only as new roll calls are added). billinfo
-      # HTML is intentionally NOT in the cache path — it carries the bill
-      # pipeline_stage status which changes daily during session, so we want a
-      # fresh fetch every night.
-      - name: Restore scrape cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            worker/.scrape-cache/${{ env.SESSION }}/pdfs
-            worker/.scrape-cache/${{ env.SESSION }}/votes
-          key: scrape-cache-${{ env.SESSION }}-${{ github.run_id }}
-          restore-keys: |
-            scrape-cache-${{ env.SESSION }}-
+      # No cross-run scrape cache. Everything mutable (billinfo, votes-page HTML)
+      # must be re-fetched each night to see new bills/roll-calls, and immutable
+      # PDFs are skipped via D1's `roll_calls.pdf_doc_id` check inside the script
+      # — they're never re-downloaded once their votes are in D1. The local
+      # .scrape-cache/ dir still works for dev-time iteration; CI just doesn't
+      # need it to persist between runs.
 
       # Mark any orphaned 'running' rows from a crashed-runner / force-cancelled
       # previous run as 'error' so the next 'finalize' step doesn't accidentally
