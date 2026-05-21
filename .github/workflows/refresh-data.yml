@@ -97,6 +97,16 @@ jobs:
       - name: Push term dates to remote D1
         run: npx wrangler d1 execute la_vote_tracker --remote --file /tmp/term_dates.sql
 
+      # Scrape chamber leadership (Speaker / President / President Pro Tem).
+      # Must run after rosters since the SQL resolves legislators via (chamber, source_id).
+      # parse-rollcalls reads session_leadership to attribute "Mr. Speaker" /
+      # "Mr. President" / "Mr./Madam President Pro Tem" votes to the right person.
+      - name: Scrape chamber leadership
+        run: node --experimental-strip-types scripts/scrape-leadership.mjs "$SESSION" /tmp/leadership.sql
+
+      - name: Push leadership to remote D1
+        run: npx wrangler d1 execute la_vote_tracker --remote --file /tmp/leadership.sql
+
       - name: Scrape bills + pipeline status
         run: node --experimental-strip-types scripts/scrape-bills.mjs "$SESSION" "" /tmp/bills.sql
 

@@ -53,26 +53,21 @@ mkdirSync(VOTES_CACHE, { recursive: true });
 const UA = 'Mozilla/5.0 (la-vote-tracker pdf fetcher; civic data project)';
 const PAUSE_MS = 150;
 
-// Chamber leadership — PDFs use "Mr. Speaker" / "Mr. President" for the chair.
-// Looked up by hand per session since rosters don't expose this role.
-// Same leadership carries through the 4-year term (2024-2028): House Speaker
-// Phillip DeVillier (R-41), Senate President Cameron Henry (R-9), Senate
-// President Pro Tem Regina Barrow (D-15). Used for 24RS, 25RS, 26RS, 27RS
-// and any extraordinary sessions in between.
-const LEADERSHIP_2024_TERM = {
-    'Mr. Speaker':              { chamber: 'H', last: 'DeVillier' },
-    'Mr. President':            { chamber: 'S', last: 'Henry' },
-    'Madam President Pro Tem':  { chamber: 'S', last: 'Barrow' },
-    'Mr. President Pro Tem':    { chamber: 'S', last: 'Barrow' },
+// Chamber leadership — PDFs use "Mr. Speaker" / "Mr. President" /
+// "Mr./Madam President Pro Tem" for the chair without naming them. The map
+// from those title strings to the right legislator is loaded from D1
+// (session_leadership table, populated by scrape-leadership.mjs) so it
+// stays current without code changes when leadership changes mid-term.
+//
+// PDF title (lowercased, normalized) → session_leadership.role
+const LEADERSHIP_TITLE_TO_ROLE = {
+    'mr. speaker':              'speaker',
+    'madam speaker':            'speaker',
+    'mr. president':            'president',
+    'madam president':          'president',
+    'mr. president pro tem':    'president_pro_tem',
+    'madam president pro tem':  'president_pro_tem',
 };
-const LEADERSHIP_BY_SESSION = {
-    '24RS': LEADERSHIP_2024_TERM,
-    '25RS': LEADERSHIP_2024_TERM,
-    '26RS': LEADERSHIP_2024_TERM,
-    '27RS': LEADERSHIP_2024_TERM,
-};
-const LEADERSHIP = LEADERSHIP_BY_SESSION[SESSION] ?? {};
-
 function escSql(v) {
     if (v === null || v === undefined) return 'NULL';
     return `'${String(v).replace(/'/g, "''")}'`;
@@ -93,6 +88,22 @@ const rosterRaw = runD1(
 const pdfOnlyRaw = runD1(
     `SELECT id, chamber, last_name FROM legislators WHERE source = 'pdf'`,
 );
+
+// Load session_leadership: PDF chair-title → roster member for this session.
+// Built into a map keyed by the lowercase title strings that appear in PDFs.
+const leadershipRows = runD1(
+    `SELECT sl.role, l.chamber, l.last_name
+     FROM session_leadership sl
+     JOIN legislators l ON l.id = sl.legislator_id
+     JOIN sessions s    ON s.id = sl.session_id
+     WHERE s.name = '${SESSION}'`,
+);
+const LEADERSHIP = {};
+for (const [title, role] of Object.entries(LEADERSHIP_TITLE_TO_ROLE)) {
+    const row = leadershipRows.find((r) => r.role === role);
+    if (row) LEADERSHIP[title] = { chamber: row.chamber, last: row.last_name };
+}
+console.error(`Loaded ${Object.keys(LEADERSHIP).length} chair title mappings.`);
 
 function norm(s) {
     return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -229,7 +240,9 @@ function firstNameHasInitial(firstName, initial) {
 }
 
 function lookupMember(name, chamber, rollCallDate) {
-    const leader = LEADERSHIP[name];
+    // Chair titles (LEADERSHIP keys) are lowercased in setup; the PDF text
+    // capitalises them ("Mr. Speaker"). Compare with toLowerCase().
+    const leader = LEADERSHIP[name.toLowerCase()];
     if (leader) {
         return byChamberLast[leader.chamber].get(norm(leader.last))?.[0] ?? null;
     }

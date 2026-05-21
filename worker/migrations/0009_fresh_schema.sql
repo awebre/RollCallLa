@@ -119,6 +119,20 @@ CREATE INDEX idx_bills_session         ON bills(session_id);
 CREATE INDEX idx_bills_pipeline_stage  ON bills(pipeline_stage);
 CREATE INDEX idx_bills_next_chamber    ON bills(next_chamber);
 
+-- ── session_leadership ────────────────────────────────────────────────────────
+-- Per-session map of chair titles → the legislator currently holding the role.
+-- Source: senate.la.gov/Officers and house.louisiana.gov/H_Staff_Speaker.aspx
+-- (scraped by scrape-leadership.mjs). Used by parse-rollcalls.mjs to credit
+-- "Mr. Speaker" / "Mr. President" / "Madam President Pro Tem" votes to the
+-- right legislator — chamber rosters don't expose these roles.
+CREATE TABLE session_leadership (
+    id              INTEGER PRIMARY KEY,
+    session_id      INTEGER NOT NULL REFERENCES sessions(id),
+    role            TEXT    NOT NULL CHECK(role IN ('speaker','president','president_pro_tem')),
+    legislator_id   INTEGER NOT NULL REFERENCES legislators(id),
+    UNIQUE(session_id, role)
+);
+
 -- ── bill_subjects ─────────────────────────────────────────────────────────────
 CREATE TABLE bill_subjects (
     id        INTEGER PRIMARY KEY,
