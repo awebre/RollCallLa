@@ -58,6 +58,13 @@ jobs:
           restore-keys: |
             scrape-cache-${{ env.SESSION }}-
 
+      # Invalidate billinfo/ cache every run. BillInfo.aspx pages drive the bill
+      # pipeline_stage classifier — caching them indefinitely would keep the UI
+      # showing stale "Pending House Committee" status for bills that have since
+      # passed. PDFs and votes-page HTML stay cached (they're immutable once published).
+      - name: Invalidate stale billinfo cache
+        run: rm -rf .scrape-cache/${{ env.SESSION }}/billinfo
+
       # Mark any orphaned 'running' rows from a crashed-runner / force-cancelled
       # previous run as 'error' so the next 'finalize' step doesn't accidentally
       # close out the wrong row. The workflow's concurrency group serializes
@@ -71,42 +78,53 @@ jobs:
             WHERE status = 'running';
           "
 
-      # Record the start of this refresh in ingest_runs so the API can surface
-      # a "last refresh" timestamp and the UI can flag stale data. The row gets
-      # status='running' first, finalized to 'success' or 'error' at the end.
-      - name: Record ingest start
-        run: |
-          npx wrangler d1 execute la_vote_tracker --remote --command "
-            INSERT INTO ingest_runs (started_at, trigger, status)
-            VALUES (datetime('now'), '${{ github.event_name == 'schedule' && 'cron' || 'manual' }}', 'running');
-          "
-
+      # Scrape rosters first — this also upserts the session row that the rest
+      # of the pipeline references via subquery.
       - name: Scrape rosters (Senate + House)
-        run: node scripts/scrape-rosters.mjs /tmp/rosters.sql
+        run: node --experimental-strip-types scripts/scrape-rosters.mjs "$SESSION" /tmp/rosters.sql
 
       - name: Push rosters to remote D1
         run: npx wrangler d1 execute la_vote_tracker --remote --file /tmp/rosters.sql
 
+      # Record the start of this refresh AFTER rosters have created the session
+      # row, so the FK is resolvable. status='running' first, finalized to
+      # 'success' or 'error' at the end.
+      - name: Record ingest start
+        run: |
+          npx wrangler d1 execute la_vote_tracker --remote --command "
+            INSERT INTO ingest_runs (started_at, session_id, stage, trigger, status)
+            VALUES (
+              datetime('now'),
+              (SELECT id FROM sessions WHERE name='${{ env.SESSION }}'),
+              'full',
+              '${{ github.event_name == 'schedule' && 'cron' || 'manual' }}',
+              'running'
+            );
+          "
+
       - name: Scrape Year Elected per member
-        run: node scripts/scrape-term-dates.mjs
+        run: node --experimental-strip-types scripts/scrape-term-dates.mjs "$SESSION" /tmp/term_dates.sql
 
       - name: Push term dates to remote D1
         run: npx wrangler d1 execute la_vote_tracker --remote --file /tmp/term_dates.sql
 
-      - name: Scrape bills + roll-call metadata
+      - name: Scrape bills + pipeline status
         run: node --experimental-strip-types scripts/scrape-bills.mjs "$SESSION" "" /tmp/bills.sql
 
       - name: Push bills to remote D1
         run: npx wrangler d1 execute la_vote_tracker --remote --file /tmp/bills.sql
 
+      # parse-rollcalls reads bills.docs_id from D1 to discover PDFs, so bills
+      # must be pushed first. Output path matches the default OUT_PATH in the
+      # script (which honors the --out flag if we need a different name).
       - name: Parse roll-call PDFs into per-member votes
-        run: node --experimental-strip-types scripts/parse-rollcalls.mjs
+        run: node --experimental-strip-types scripts/parse-rollcalls.mjs "$SESSION" --out /tmp/rollcall_votes.sql
 
       - name: Push per-member votes to remote D1
         run: npx wrangler d1 execute la_vote_tracker --remote --file /tmp/rollcall_votes.sql
 
       - name: Scrape Wikipedia infoboxes for term_start / term_end
-        run: node scripts/scrape-wiki-terms.mjs
+        run: node --experimental-strip-types scripts/scrape-wiki-terms.mjs "$SESSION" /tmp/wiki_terms.sql
 
       - name: Push term provenance to remote D1
         run: npx wrangler d1 execute la_vote_tracker --remote --file /tmp/wiki_terms.sql

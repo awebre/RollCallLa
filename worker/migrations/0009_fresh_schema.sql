@@ -179,12 +179,16 @@ CREATE INDEX idx_votes_vote       ON votes(vote);
 
 -- ── ingest_runs ───────────────────────────────────────────────────────────────
 -- Audit log for nightly pipeline runs.
+-- 'full' is the GHA nightly pipeline run; the per-script stages are kept in
+-- the enum for manual/ad-hoc invocations of a single scraper step.
 CREATE TABLE ingest_runs (
     id              INTEGER PRIMARY KEY,
     started_at      TEXT    NOT NULL,
     finished_at     TEXT,
     session_id      INTEGER NOT NULL REFERENCES sessions(id),
-    stage           TEXT    NOT NULL CHECK(stage IN ('scrape-bills','parse-rollcalls')),
+    stage           TEXT    NOT NULL CHECK(stage IN (
+                        'full','rosters','term-dates','scrape-bills',
+                        'parse-rollcalls','wiki-terms')),
     trigger         TEXT    NOT NULL DEFAULT 'cron'
                         CHECK(trigger IN ('cron','manual')),
     status          TEXT    NOT NULL DEFAULT 'running'
