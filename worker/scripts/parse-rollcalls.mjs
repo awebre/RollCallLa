@@ -287,7 +287,14 @@ function queueSynthetic(chamber, displayName, normKey) {
 // Roster members get their session membership from scrape-rosters; this only fires
 // for unmatched names that got minted as pdf-only synthetics. active=0 marks them
 // as not-currently-serving for the session (they wouldn't be a synthetic otherwise).
+//
+// Skipped when a roster member with the same last_name exists in this session —
+// in that case the unmatched name is almost certainly a disambiguation failure
+// between two same-surname roster members (e.g. Chance Henry + Dana Henry in 26RS
+// House), not a departed-mid-cycle legislator. The vote still records against
+// the pdf-only synthetic; we just don't claim they "served" in this session.
 function queuePdfMembership(chamber, normKey) {
+    if (byChamberLast[chamber].has(normKey)) return; // roster has same-name members — ambiguity, not absence
     const memKey = `${chamber}:${normKey}`;
     if (pdfMembershipQueued.has(memKey)) return;
     pdfMembershipQueued.add(memKey);
