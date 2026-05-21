@@ -1,4 +1,4 @@
-export function partyColorClass(party: string | null): string {
+export function partyColorClass(party: string | null | undefined): string {
   if (party === "D") return "text-(--party-d)";
   if (party === "R") return "text-(--party-r)";
   if (party === "I") return "text-(--party-i)";

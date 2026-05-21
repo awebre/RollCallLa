@@ -87,6 +87,7 @@ export const errorState: AgendaResult = {
   time: null,
   location: null,
   in_progress: false,
+  adjourned: false,
   items: [],
   fetched_at: new Date().toISOString(),
   ok: false,

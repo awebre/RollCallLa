@@ -304,7 +304,7 @@ export function LegislatorDetail({ id }: { id: number }) {
   );
 }
 
-function partyName(p: string | null) {
+function partyName(p: string | null | undefined) {
   if (p === "D") return "Democrat";
   if (p === "R") return "Republican";
   if (p === "I") return "Independent";
