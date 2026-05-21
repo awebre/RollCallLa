@@ -119,16 +119,18 @@ function decode(s) {
 /**
  * Best-effort classifier for LabelCurrentStatus into our pipeline_stage vocabulary.
  *
- * Tuned against real 24RS status text. Sample patterns observed:
- *   "Signed by the Governor - Act 4"          → enacted (bills)
- *   "Sent to the Secretary of State"           → enacted (resolutions: HCR/HR/SR/etc)
- *   "Pending House Appropriations"             → committee
- *   "Pending Senate and Governmental Affairs"  → committee
- *   "Subject to call - Senate final passage"   → floor
+ * Tuned against real 24RS + 26RS status text. Notable sample patterns:
+ *   "Signed by the Governor - Act 4"           → enacted (bills)
+ *   "Sent to the Secretary of State"            → enacted (resolutions)
+ *   "Signed by the President / Speaker"         → governor (enrollment, heading to Gov)
+ *   "Pending House Appropriations"              → committee
+ *   "Passed the House" / "Passed the Senate"    → floor (between final passage and engross)
+ *   "Pending Legislative Bureau"                → floor (engrossment workflow)
+ *   "Subject to call - Senate final passage"    → floor
+ *   "Subject to call - Senate referral"         → committee
+ *   "Rejected in the House"                     → dead
  *
- * Order matters — most-specific patterns first. Extend as new variants surface
- * in active sessions (introduction, concurrence, governor-pending all expected
- * once 26RS is scraped live).
+ * Order matters — most-specific patterns first.
  */
 function categoriseStatus(statusText, originatingChamber) {
     if (!statusText) return { stage: 'introduced', next_chamber: null };
@@ -139,14 +141,20 @@ function categoriseStatus(statusText, originatingChamber) {
     if (/signed\s+by\s+(the\s+)?governor|sent\s+to\s+the\s+secretary\s+of\s+state|\bact\s+(?:no\.?\s*)?\d|\beffective\b|\bbecame\s+law\b/.test(t)) {
         return { stage: 'enacted', next_chamber: null };
     }
-    // On governor's desk (sent but not yet signed)
-    if (/sent\s+to\s+(the\s+)?governor|on\s+governor'?s?\s+desk|delivered\s+to\s+(the\s+)?governor/.test(t)) {
+    // On governor's desk (sent but not yet signed). "Signed by the President" /
+    // "Signed by the Speaker" are the enrollment steps that precede sending to
+    // the Governor; treat them as governor too — the bill's next stop is Gov.
+    if (
+        /sent\s+to\s+(the\s+)?governor|on\s+governor'?s?\s+desk|delivered\s+to\s+(the\s+)?governor/.test(t) ||
+        /signed\s+by\s+(the\s+)?(?:president|speaker)/.test(t)
+    ) {
         return { stage: 'governor', next_chamber: null };
     }
     // Dead-end states
     if (
         /withdrawn|indefinitely\s+(?:postponed|deferred)|failed\s+to\s+pass|died\s+in\s+committee|vetoed/.test(t) ||
         /failed\s+(?:house|senate)\s+final\s+passage/.test(t) ||
+        /rejected\s+in\s+the\s+(?:house|senate)/.test(t) ||
         /substitute\s+adopted\s+on\s+the\s+(?:house|senate)\s+floor/.test(t) ||  // original replaced by substitute
         /involuntarily\s+deferred/.test(t)
     ) {
@@ -156,28 +164,33 @@ function categoriseStatus(statusText, originatingChamber) {
     if (/concurrence|returned\s+from\s+(house|senate)|conference\s+committee|amendments\s+rejected/.test(t)) {
         return { stage: 'concurrence', next_chamber: originatingChamber };
     }
-    // Floor activity (final passage, readings, calendar, "subject to call").
+    // Floor activity (final passage, readings, calendar, "subject to call",
+    // passed-chamber, and the Legislative Bureau engrossment workflow).
     // Match floor keywords first so "Pending House final passage" doesn't fall through to committee.
     if (
         /(?:pending|on|subject\s+to\s+call(?:\s*[-:]?\s*)?)\s*(?:house|senate)?\s+(?:floor|final\s+passage|third\s+reading|second\s+reading|calendar)/.test(t) ||
-        /passed\s+by\s+(?:the\s+)?(?:house|senate)/.test(t) ||
-        /\bread\s+by\s+title\b/.test(t)
+        /passed\s+(?:by\s+(?:the\s+)?)?(?:the\s+)?(house|senate)/.test(t) ||
+        /\bread\s+by\s+title\b/.test(t) ||
+        /\blegislative\s+bureau\b/.test(t)
     ) {
         const m = t.match(/(house|senate)/);
         return { stage: 'floor', next_chamber: m ? (m[1] === 'house' ? 'H' : 'S') : null };
     }
-    // Committee — "Pending <chamber> <committee-name>" or explicit committee verbs.
+    // Committee — "Pending <chamber> <committee-name>", explicit committee verbs,
+    // or "Subject to call - <chamber> referral" (queued for committee assignment).
     // The chamber name is followed by a committee name (any non-whitespace), not a
     // floor keyword (those were caught above).
     if (
         /pending\s+(house|senate)\s+\S/.test(t) ||
-        /(?:referred\s+to|reported\s+by|heard\s+by)\s+(?:the\s+)?(?:house|senate)?\s*committee/.test(t)
+        /(?:referred\s+to|reported\s+by|heard\s+by)\s+(?:the\s+)?(?:house|senate)?\s*committee/.test(t) ||
+        /subject\s+to\s+call.*\b(house|senate)\s+referral/.test(t)
     ) {
-        const m = t.match(/pending\s+(house|senate)/);
+        const m = t.match(/(?:pending|referral)?\s*(house|senate)/);
         return { stage: 'committee', next_chamber: m ? (m[1] === 'house' ? 'H' : 'S') : null };
     }
-    // Introduced
-    if (/introduced|pending\s+introduction|filed|prefiled|read\s+first\s+time/.test(t)) {
+    // Introduced — includes "Distributed to <chamber> members" which is the
+    // pre-introduction state before a bill is officially read.
+    if (/introduced|pending\s+introduction|filed|prefiled|read\s+first\s+time|distributed\s+to\s+(?:house|senate)\s+members/.test(t)) {
         return { stage: 'introduced', next_chamber: originatingChamber };
     }
     return { stage: 'other', next_chamber: null };

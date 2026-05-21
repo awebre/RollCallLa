@@ -55,15 +55,21 @@ const PAUSE_MS = 150;
 
 // Chamber leadership — PDFs use "Mr. Speaker" / "Mr. President" for the chair.
 // Looked up by hand per session since rosters don't expose this role.
-// 24RS: House Speaker Phillip DeVillier (R-41); Senate President Cameron Henry (R-9);
-//       Senate President Pro Tem Regina Barrow (D-15).
+// Same leadership carries through the 4-year term (2024-2028): House Speaker
+// Phillip DeVillier (R-41), Senate President Cameron Henry (R-9), Senate
+// President Pro Tem Regina Barrow (D-15). Used for 24RS, 25RS, 26RS, 27RS
+// and any extraordinary sessions in between.
+const LEADERSHIP_2024_TERM = {
+    'Mr. Speaker':              { chamber: 'H', last: 'DeVillier' },
+    'Mr. President':            { chamber: 'S', last: 'Henry' },
+    'Madam President Pro Tem':  { chamber: 'S', last: 'Barrow' },
+    'Mr. President Pro Tem':    { chamber: 'S', last: 'Barrow' },
+};
 const LEADERSHIP_BY_SESSION = {
-    '24RS': {
-        'Mr. Speaker':              { chamber: 'H', last: 'DeVillier' },
-        'Mr. President':            { chamber: 'S', last: 'Henry' },
-        'Madam President Pro Tem':  { chamber: 'S', last: 'Barrow' },
-        'Mr. President Pro Tem':    { chamber: 'S', last: 'Barrow' },
-    },
+    '24RS': LEADERSHIP_2024_TERM,
+    '25RS': LEADERSHIP_2024_TERM,
+    '26RS': LEADERSHIP_2024_TERM,
+    '27RS': LEADERSHIP_2024_TERM,
 };
 const LEADERSHIP = LEADERSHIP_BY_SESSION[SESSION] ?? {};
 
