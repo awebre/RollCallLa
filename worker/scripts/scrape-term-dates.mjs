@@ -65,7 +65,7 @@ console.error(`Loading term info for ${members.length} legislators in ${SESSION}
 const sql = [
     `-- Term dates scraped from legislator profile pages for session ${SESSION}`,
     `-- ${new Date().toISOString()}`,
-    `BEGIN TRANSACTION;`,
+    `-- D1 remote rejects BEGIN/COMMIT; each statement runs in its own transaction`,
 ];
 let resolved = 0;
 let unresolved = 0;
@@ -94,7 +94,7 @@ for (const m of members) {
     }
 }
 
-sql.push(`COMMIT;`);
+sql.push(`-- end batch`);
 
 writeFileSync(OUT_PATH, sql.join('\n'));
 console.error(`Wrote ${OUT_PATH}`);

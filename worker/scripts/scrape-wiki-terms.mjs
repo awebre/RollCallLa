@@ -134,7 +134,7 @@ for (const s of synthetics) syntheticByKey.set(`${s.chamber}|${s.last_name.toLow
 const sql = [
     `-- Term dates from Wikipedia for session ${SESSION}`,
     `-- ${new Date().toISOString()}`,
-    `BEGIN TRANSACTION;`,
+    `-- D1 remote rejects BEGIN/COMMIT; each statement runs in its own transaction`,
 ];
 let hits = 0;
 let predecessorHits = 0;
@@ -187,7 +187,7 @@ for (const l of candidates) {
     }
 }
 
-sql.push(`COMMIT;`);
+sql.push(`-- end batch`);
 
 writeFileSync(OUT_PATH, sql.join('\n'));
 console.error(`Wrote ${OUT_PATH}. ${hits} term_start rows, ${predecessorHits} predecessor term_end rows.`);

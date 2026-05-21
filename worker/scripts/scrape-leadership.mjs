@@ -97,11 +97,11 @@ function upsert(role, chamber, sourceId) {
 const sql = [
     `-- Chamber leadership scraped for session ${SESSION}`,
     `-- ${new Date().toISOString()}`,
-    `BEGIN TRANSACTION;`,
+    `-- D1 remote rejects BEGIN/COMMIT; each statement runs in its own transaction`,
     upsert('president',         'S', senate.president),
     upsert('president_pro_tem', 'S', senate.president_pro_tem),
     upsert('speaker',           'H', speakerId),
-    `COMMIT;`,
+    `-- end batch`,
 ].join('\n');
 
 writeFileSync(OUT_PATH, sql);

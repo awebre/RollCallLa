@@ -215,13 +215,13 @@ const sessionType = isSpecialSession(SESSION) ? 'special' : 'regular';
 const sql = [
     `-- Scraped from senate.la.gov + house.louisiana.gov for session ${SESSION}`,
     `-- ${new Date().toISOString()}`,
-    `BEGIN TRANSACTION;`,
+    `-- D1 remote rejects BEGIN/COMMIT; each statement runs in its own transaction`,
     `INSERT INTO sessions (name, year, type) VALUES (${escSql(SESSION)}, ${sessionParsed.year}, ${escSql(sessionType)}) ON CONFLICT(name) DO UPDATE SET year=excluded.year, type=excluded.type;`,
     buildLegislatorUpserts(senators),
     buildLegislatorUpserts(reps),
     buildLegislatorSessionUpserts(senators),
     buildLegislatorSessionUpserts(reps),
-    `COMMIT;`,
+    `-- end batch`,
 ].join('\n');
 
 writeFileSync(OUT_PATH, sql);

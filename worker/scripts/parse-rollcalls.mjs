@@ -441,13 +441,13 @@ for (const bill of billsRaw) {
 const out = [
     `-- parse-rollcalls output for session ${SESSION}`,
     `-- ${new Date().toISOString()}`,
-    `BEGIN TRANSACTION;`,
+    `-- D1 remote rejects BEGIN/COMMIT; each statement runs in its own transaction`,
     // pdf-only legislator rows must be inserted before any session memberships
     // or votes that reference them via the (chamber, last_name) subquery.
     ...syntheticInserts,
     ...sessionMembershipInserts,
     ...rcChunks,
-    `COMMIT;`,
+    `-- end batch`,
 ].join('\n');
 writeFileSync(OUT_PATH, out);
 
