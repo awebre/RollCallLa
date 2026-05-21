@@ -48,22 +48,20 @@ jobs:
 
       - run: npm ci
 
-      # Persist .scrape-cache so weekly runs only fetch deltas. The key changes when
-      # the session input changes, so a different-session run gets its own cache.
+      # Cache only the immutable parts: PDFs (~300 MB, never change once published)
+      # and votes-page HTML (append-only as new roll calls are added). billinfo
+      # HTML is intentionally NOT in the cache path — it carries the bill
+      # pipeline_stage status which changes daily during session, so we want a
+      # fresh fetch every night.
       - name: Restore scrape cache
         uses: actions/cache@v4
         with:
-          path: worker/.scrape-cache
+          path: |
+            worker/.scrape-cache/${{ env.SESSION }}/pdfs
+            worker/.scrape-cache/${{ env.SESSION }}/votes
           key: scrape-cache-${{ env.SESSION }}-${{ github.run_id }}
           restore-keys: |
             scrape-cache-${{ env.SESSION }}-
-
-      # Invalidate billinfo/ cache every run. BillInfo.aspx pages drive the bill
-      # pipeline_stage classifier — caching them indefinitely would keep the UI
-      # showing stale "Pending House Committee" status for bills that have since
-      # passed. PDFs and votes-page HTML stay cached (they're immutable once published).
-      - name: Invalidate stale billinfo cache
-        run: rm -rf .scrape-cache/${{ env.SESSION }}/billinfo
 
       # Mark any orphaned 'running' rows from a crashed-runner / force-cancelled
       # previous run as 'error' so the next 'finalize' step doesn't accidentally
@@ -92,11 +90,10 @@ jobs:
       - name: Record ingest start
         run: |
           npx wrangler d1 execute la_vote_tracker --remote --command "
-            INSERT INTO ingest_runs (started_at, session_id, stage, trigger, status)
+            INSERT INTO ingest_runs (started_at, session_id, trigger, status)
             VALUES (
               datetime('now'),
               (SELECT id FROM sessions WHERE name='${{ env.SESSION }}'),
-              'full',
               '${{ github.event_name == 'schedule' && 'cron' || 'manual' }}',
               'running'
             );
