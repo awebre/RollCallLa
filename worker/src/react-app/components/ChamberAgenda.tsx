@@ -347,13 +347,28 @@ export function ChamberAgenda({ chamber, showEmpty }: { chamber: "H" | "S"; show
 
 // ── Shared row ────────────────────────────────────────────────────────────────
 
-const CATEGORY_LABEL: Record<AgendaCategory, string | null> = {
-  final_passage:  null,           // primary content — no label needed
+// Every category gets an explicit label — leaving final_passage unlabeled
+// previously made it indistinguishable from "other" (the classifier's
+// catchall), which is exactly the wrong UX.
+const CATEGORY_LABEL: Record<AgendaCategory, string> = {
+  final_passage:  "Final Passage",
   concurrence:    "Concurrence",
   second_reading: "2nd Reading",
   introduction:   "Introduction",
   deferred:       "Deferred",
-  other:          null,
+  other:          "Other",
+};
+
+// Visual treatment per category, matching the bills page's pipeline_stage
+// palette so the two views feel like one system. The badge tells you what's
+// happening; the color tells you how decisive it is.
+const CATEGORY_CLASS: Record<AgendaCategory, string> = {
+  final_passage:  "text-(--vote-yea) font-semibold",      // the main event
+  concurrence:    "text-(--vote-yea) font-semibold",      // also decisive
+  second_reading: "text-(--app-text-mid)",                // floor activity but not the decision
+  introduction:   "text-(--app-text-muted)",              // informational
+  deferred:       "text-(--app-text-subtle) line-through",// stalled
+  other:          "text-(--app-text-muted)",              // catchall
 };
 
 export function AgendaRow({
@@ -397,8 +412,8 @@ export function AgendaRow({
       </span>
       <span className="shrink-0 text-(--app-text-muted)">{item.author}</span>
       <span className="min-w-0 flex-1 truncate text-(--app-text-mid)">{item.subject}</span>
-      {showCategory && CATEGORY_LABEL[item.category] && (
-        <span className="shrink-0 font-sans text-[0.68rem] text-(--app-text-subtle)">
+      {showCategory && (
+        <span className={`shrink-0 font-sans text-[0.68rem] ${CATEGORY_CLASS[item.category]}`}>
           {CATEGORY_LABEL[item.category]}
         </span>
       )}
