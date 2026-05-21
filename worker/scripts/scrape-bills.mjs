@@ -144,7 +144,12 @@ function categoriseStatus(statusText, originatingChamber) {
         return { stage: 'governor', next_chamber: null };
     }
     // Dead-end states
-    if (/withdrawn|indefinitely\s+(?:postponed|deferred)|failed\s+to\s+pass|died\s+in\s+committee|vetoed/.test(t)) {
+    if (
+        /withdrawn|indefinitely\s+(?:postponed|deferred)|failed\s+to\s+pass|died\s+in\s+committee|vetoed/.test(t) ||
+        /failed\s+(?:house|senate)\s+final\s+passage/.test(t) ||
+        /substitute\s+adopted\s+on\s+the\s+(?:house|senate)\s+floor/.test(t) ||  // original replaced by substitute
+        /involuntarily\s+deferred/.test(t)
+    ) {
         return { stage: 'dead', next_chamber: null };
     }
     // Concurrence — originating chamber must accept other chamber's amendments
