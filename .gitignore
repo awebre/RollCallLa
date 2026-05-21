@@ -144,3 +144,9 @@ vite.config.ts.timestamp-*
 
 # Claude Code workspace state
 .claude/
+
+# Wrangler local state (D1 SQLite, R2 cache, auth tokens). Path-scoped to
+# both the repo-root .wrangler/ (where the worktree's own state lives) and
+# worker/.wrangler/ where the worker dev server writes by default.
+.wrangler/
+worker/.wrangler/

@@ -50,6 +50,20 @@ export type RollCallMember = {
     district?: number | null;
 };
 
+export type Bill = {
+    id: number;
+    bill_number: string;
+    bill_type: string;
+    originating_chamber: 'H' | 'S';
+    title: string | null;
+    pipeline_stage:
+        | 'introduced' | 'committee' | 'floor' | 'concurrence'
+        | 'governor' | 'enacted' | 'dead' | 'other';
+    next_chamber: 'H' | 'S' | null;
+    status_text: string | null;
+    docs_id: number | null;
+};
+
 export type Session = {
     id: number;
     name: string;

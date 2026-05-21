@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Switch, Route, Link, Redirect, useRoute } from 'wouter';
 import { Roster } from './views/Roster';
+import { Bills } from './views/Bills';
 import { LegislatorDetail } from './views/LegislatorDetail';
 import { RollCallDetail } from './views/RollCallDetail';
 import { DistrictMap } from './views/Map';
@@ -51,6 +52,7 @@ function Shell() {
                     <nav className="mb-5 flex gap-5 text-[0.95rem]">
                         <MapNavLink />
                         <RosterNavLink />
+                        <BillsNavLink />
                         <AgendaNavLink />
                         <AdminNavLink />
                         <LogoutNavButton />
@@ -60,6 +62,7 @@ function Shell() {
                         <Route path="/"><Redirect to="/map" /></Route>
                         <Route path="/map" component={DistrictMap} />
                         <Route path="/roster" component={Roster} />
+                        <Route path="/bills" component={Bills} />
                         <Route path="/legislator/:id">
                             {(params) => <LegislatorDetail id={Number(params.id)} />}
                         </Route>
@@ -96,6 +99,11 @@ function RosterNavLink() {
     const [onRoster]     = useRoute('/roster');
     const [onLegislator] = useRoute('/legislator/:id');
     return <Link href="/roster" className={navLinkClass(onRoster || onLegislator)}>Roster</Link>;
+}
+
+function BillsNavLink() {
+    const [onBills] = useRoute('/bills');
+    return <Link href="/bills" className={navLinkClass(onBills)}>Bills</Link>;
 }
 
 function AgendaNavLink() {
