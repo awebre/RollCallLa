@@ -21,7 +21,7 @@ type Profile = {
 
 export function LegislatorDetail({ id }: { id: number }) {
   const { current } = useSession();
-  const sessionId = current?.session_id ?? null;
+  const sessionId = current?.id ?? null;
   const { openFeedback } = useFeedback();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [votes, setVotes] = useState<LegislatorVoteRow[]>([]);
@@ -60,13 +60,13 @@ export function LegislatorDetail({ id }: { id: number }) {
   const { legislator: l, final_passage_tally: t, party_line } = profile;
   const fp_total = t.yea + t.nay + t.nv + t.absent;
 
-  // Derive the chamber-site profile URL from the encoded people_id.
-  // Encoding: Senate = 10000 + site_id, House = 20000 + site_id.
-  // Not available for pdf-only legislators (no roster match).
-  const profileUrl = l.source !== 'pdf' && l.role
-    ? l.role === 'Sen'
-      ? `https://senate.la.gov/smembers.aspx?ID=${l.people_id - 10000}`
-      : `https://house.louisiana.gov/H_Reps/members.aspx?ID=${l.people_id - 20000}`
+  // Chamber-site profile URL uses source_id directly (the actual ID from
+  // senate.la.gov or house.louisiana.gov). Not available for pdf-only
+  // legislators (no roster match → source_id is null).
+  const profileUrl = l.source !== 'pdf' && l.source_id != null
+    ? l.chamber === 'S'
+      ? `https://senate.la.gov/smembers.aspx?ID=${l.source_id}`
+      : `https://house.louisiana.gov/H_Reps/members.aspx?ID=${l.source_id}`
     : null;
 
   return (
@@ -78,11 +78,7 @@ export function LegislatorDetail({ id }: { id: number }) {
       </p>
       <h2 className="mb-0 text-[1.6rem]">
         {formatName(l)}
-        <ProvenanceBadge
-          source={l.source}
-          term_source={l.term_source}
-          style={{ fontSize: "0.65rem" }}
-        />
+        <ProvenanceBadge source={l.source} style={{ fontSize: "0.65rem" }} />
       </h2>
       <p className="mt-[0.2rem] text-(--app-text-mid)">
         <span className={`font-semibold ${partyColorClass(l.party)}`}>
@@ -308,7 +304,7 @@ export function LegislatorDetail({ id }: { id: number }) {
   );
 }
 
-function partyName(p: string | null) {
+function partyName(p: string | null | undefined) {
   if (p === "D") return "Democrat";
   if (p === "R") return "Republican";
   if (p === "I") return "Independent";

@@ -25,47 +25,49 @@ app.get('/geo/:vintage/:file', async (c) => {
     return c.body(obj.body);
 });
 
+// ── sessions ─────────────────────────────────────────────────────────────────
+// API field names mirror the new schema: `id` (surrogate), `name`, `year`,
+// `type` ('regular'|'special'), `map_vintage`. Frontend types updated to match.
 app.get('/api/sessions', async (c) => {
     const db = c.env.la_vote_tracker;
     const { results } = await db.prepare(
-        `SELECT session_id, name, year_start, year_end, special, map_vintage FROM sessions ORDER BY year_start DESC, session_id DESC`,
+        `SELECT id, name, year, type, start_date, end_date, map_vintage
+         FROM sessions ORDER BY year DESC, id DESC`,
     ).all();
     c.header('cache-control', CACHE);
     return c.json({ sessions: results });
 });
 
+// ── status / counts ──────────────────────────────────────────────────────────
 app.get('/api/status', async (c) => {
     const db = c.env.la_vote_tracker;
     const sessionId = Number(c.req.query('session_id')) || null;
-    // When session_id is supplied, scope counts to that session. The legislators count
-    // becomes "distinct members who voted in this session" — honest about turnover.
+
+    // When scoped, restrict every count to that session via FK joins.
+    // "active_legislators" becomes "session members" — explicit roster membership
+    // rather than the inferred-from-votes count the old code did, since
+    // legislator_sessions is now the source of truth for who served when.
     const queries = sessionId
         ? [
             db.prepare(`SELECT COUNT(*) AS n FROM bills WHERE session_id = ?`).bind(sessionId),
-            db.prepare(
-                `SELECT COUNT(*) AS n FROM roll_calls rc
-                 JOIN bills b ON b.bill_id = rc.bill_id
-                 WHERE b.session_id = ?`,
-            ).bind(sessionId),
+            db.prepare(`SELECT COUNT(*) AS n FROM roll_calls WHERE session_id = ?`).bind(sessionId),
             db.prepare(
                 `SELECT COUNT(*) AS n FROM votes v
-                 JOIN roll_calls rc ON rc.roll_call_id = v.roll_call_id
-                 JOIN bills b       ON b.bill_id      = rc.bill_id
-                 WHERE b.session_id = ?`,
+                 JOIN roll_calls rc ON rc.id = v.roll_call_id
+                 WHERE rc.session_id = ?`,
             ).bind(sessionId),
             db.prepare(
-                `SELECT COUNT(DISTINCT v.people_id) AS n FROM votes v
-                 JOIN roll_calls rc ON rc.roll_call_id = v.roll_call_id
-                 JOIN bills b       ON b.bill_id      = rc.bill_id
-                 WHERE b.session_id = ?`,
+                `SELECT COUNT(*) AS n FROM legislator_sessions
+                 WHERE session_id = ? AND active = 1`,
             ).bind(sessionId),
         ]
         : [
             db.prepare(`SELECT COUNT(*) AS n FROM bills`),
             db.prepare(`SELECT COUNT(*) AS n FROM roll_calls`),
             db.prepare(`SELECT COUNT(*) AS n FROM votes`),
-            db.prepare(`SELECT COUNT(*) AS n FROM legislators WHERE active = 1`),
+            db.prepare(`SELECT COUNT(DISTINCT legislator_id) AS n FROM legislator_sessions WHERE active = 1`),
         ];
+
     const [bills, rolls, votes, legs, ingest] = await db.batch([
         ...queries,
         db.prepare(
@@ -89,25 +91,36 @@ app.get('/api/status', async (c) => {
     });
 });
 
+// ── legislators list ─────────────────────────────────────────────────────────
+// Returns one row per legislator scoped to a session (the per-session role/
+// party/district come from legislator_sessions). Without `session_id` the
+// endpoint falls back to the most recent session so the roster page always
+// has session context.
 app.get('/api/legislators', async (c) => {
     const db = c.env.la_vote_tracker;
     const { chamber, party, q, active, session_id } = c.req.query();
-    const sessionId = Number(session_id) || null;
+    let sessionId = Number(session_id) || null;
+
+    // Default to most-recent session if not supplied.
+    if (sessionId === null) {
+        const latest = await db.prepare(
+            `SELECT id FROM sessions ORDER BY year DESC, id DESC LIMIT 1`,
+        ).first<{ id: number }>();
+        sessionId = latest?.id ?? null;
+    }
 
     const where: string[] = [];
     const binds: (string | number)[] = [];
     if (chamber === 'H' || chamber === 'S') {
-        where.push('l.role = ?');
-        binds.push(chamber === 'S' ? 'Sen' : 'Rep');
+        where.push('l.chamber = ?');
+        binds.push(chamber);
     }
     if (party) {
-        where.push('l.party = ?');
+        where.push('ls.party = ?');
         binds.push(party.toUpperCase());
     }
-    // The "active" flag only makes sense without a session filter — within a session,
-    // "served then" is the meaningful predicate, derived from votes below.
-    if (!sessionId && (active === '1' || active === '0')) {
-        where.push('l.active = ?');
+    if (active === '1' || active === '0') {
+        where.push('ls.active = ?');
         binds.push(Number(active));
     }
     if (q) {
@@ -116,66 +129,74 @@ app.get('/api/legislators', async (c) => {
         binds.push(like, like, like);
     }
 
-    // When scoped to a session, restrict to legislators who actually cast at least one
-    // vote in that session (covers turnover honestly + picks up synthetic rows).
-    const sessionJoin = sessionId
-        ? `INNER JOIN (
-                SELECT DISTINCT v.people_id
-                FROM votes v
-                JOIN roll_calls rc ON rc.roll_call_id = v.roll_call_id
-                JOIN bills b       ON b.bill_id      = rc.bill_id
-                WHERE b.session_id = ?
-           ) sv ON sv.people_id = l.people_id`
-        : '';
-    if (sessionId) binds.unshift(sessionId);
-
+    // Join legislator_sessions for the supplied session. INNER join naturally
+    // restricts to people who served in that session — same effect as the old
+    // "voted in this session" subquery but cheaper + more accurate (roster
+    // members who never cast a vote still appear).
     const sql = `
-        SELECT l.people_id, l.first_name, l.middle_name, l.last_name, l.suffix, l.nickname,
-               l.party, l.role, l.district, l.active, l.source, l.term_source,
-               l.term_start, l.term_end
+        SELECT l.id, l.chamber, l.source_id, l.first_name, l.last_name, l.suffix, l.nickname,
+               ls.role, ls.party, ls.district, ls.active, l.source,
+               ls.term_start, ls.term_end, ls.year_elected
         FROM legislators l
-        ${sessionJoin}
-        ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+        JOIN legislator_sessions ls ON ls.legislator_id = l.id
+        WHERE ls.session_id = ?
+        ${where.length ? 'AND ' + where.join(' AND ') : ''}
         ORDER BY l.last_name, l.first_name
     `;
-    const { results } = await db.prepare(sql).bind(...binds).all();
+    const { results } = await db.prepare(sql).bind(sessionId, ...binds).all();
     c.header('cache-control', CACHE);
-    return c.json({ legislators: results });
+    return c.json({ legislators: results, session_id: sessionId });
 });
 
+// ── legislator detail ───────────────────────────────────────────────────────
 app.get('/api/legislators/:id', async (c) => {
     const db = c.env.la_vote_tracker;
     const id = Number(c.req.param('id'));
     if (!Number.isFinite(id)) return c.json({ error: 'bad id' }, 400);
-    const sessionId = Number(c.req.query('session_id')) || null;
+    let sessionId = Number(c.req.query('session_id')) || null;
 
-    // Scope tallies + party-line to the requested session when provided. The bill join
-    // is what carries session_id, so it gets added wherever roll_calls is involved.
-    const sessionClause = sessionId ? 'AND b.session_id = ?' : '';
-    const sessionBindsFor = (base: (string | number)[]) => (sessionId ? [...base, sessionId] : base);
+    // Default to most recent session for per-session fields (role, party, etc.).
+    if (sessionId === null) {
+        const latest = await db.prepare(
+            `SELECT id FROM sessions ORDER BY year DESC, id DESC LIMIT 1`,
+        ).first<{ id: number }>();
+        sessionId = latest?.id ?? null;
+    }
 
+    // Profile combines person-level data (legislators) with session-specific data
+    // (legislator_sessions). LEFT JOIN on the session so pdf-only legislators with
+    // no session record still resolve — their session-specific fields come back null.
     const [profile, tally, partyLine] = await db.batch([
         db.prepare(
-            `SELECT people_id, first_name, middle_name, last_name, suffix, nickname,
-                    party, role, district, active, source, term_source,
-                    term_start, term_end, year_elected
-             FROM legislators WHERE people_id = ?`,
-        ).bind(id),
+            `SELECT l.id, l.chamber, l.source_id, l.first_name, l.last_name, l.suffix, l.nickname, l.source,
+                    ls.role, ls.party, ls.district, ls.active,
+                    ls.term_start, ls.term_end, ls.year_elected
+             FROM legislators l
+             LEFT JOIN legislator_sessions ls
+                ON ls.legislator_id = l.id AND ls.session_id = ?
+             WHERE l.id = ?`,
+        ).bind(sessionId, id),
         db.prepare(
             `SELECT vote, COUNT(*) AS n
              FROM votes v
-             JOIN roll_calls rc ON rc.roll_call_id = v.roll_call_id
-             JOIN bills b       ON b.bill_id      = rc.bill_id
-             WHERE v.people_id = ? AND rc.vote_category = 'final_passage' ${sessionClause}
+             JOIN roll_calls rc ON rc.id = v.roll_call_id
+             WHERE v.legislator_id = ? AND rc.vote_category = 'final_passage'
+               AND rc.session_id = ?
              GROUP BY vote`,
-        ).bind(...sessionBindsFor([id])),
+        ).bind(id, sessionId),
         // Party Unity Score (standard CQ/GovTrack method):
         // for each final-passage roll call, determine the party's majority position
         // (whichever of Yea/Nay got more same-party same-chamber votes), then check
         // whether this legislator voted with that majority. Score = aligned / total.
+        // Party + chamber come from the SUBJECT's legislator_sessions row for the
+        // scoped session — not from legislators (which has no role anyway now).
         db.prepare(
             `WITH legi AS (
-                SELECT party, role FROM legislators WHERE people_id = ?
+                SELECT ls.party, l.chamber
+                FROM legislators l
+                JOIN legislator_sessions ls
+                    ON ls.legislator_id = l.id AND ls.session_id = ?
+                WHERE l.id = ?
              ),
              party_majority AS (
                 SELECT
@@ -184,12 +205,12 @@ app.get('/api/legislators/:id', async (c) => {
                               SUM(CASE WHEN v2.vote = 2 THEN 1 ELSE 0 END)
                          THEN 1 ELSE 2 END AS majority_vote
                 FROM votes v2
-                JOIN legislators l2 ON l2.people_id = v2.people_id
-                JOIN legi ON legi.party = l2.party AND legi.role = l2.role
-                JOIN roll_calls rc ON rc.roll_call_id = v2.roll_call_id
-                JOIN bills b       ON b.bill_id      = rc.bill_id
+                JOIN legislators l2          ON l2.id = v2.legislator_id
+                JOIN legislator_sessions ls2 ON ls2.legislator_id = l2.id AND ls2.session_id = ?
+                JOIN legi ON legi.party = ls2.party AND legi.chamber = l2.chamber
+                JOIN roll_calls rc ON rc.id = v2.roll_call_id
                 WHERE v2.vote IN (1, 2) AND rc.vote_category = 'final_passage'
-                  ${sessionClause}
+                  AND rc.session_id = ?
                 GROUP BY v2.roll_call_id
              )
              SELECT
@@ -197,8 +218,8 @@ app.get('/api/legislators/:id', async (c) => {
                 COUNT(*) AS total
              FROM votes v
              JOIN party_majority pm ON pm.roll_call_id = v.roll_call_id
-             WHERE v.people_id = ? AND v.vote IN (1, 2)`,
-        ).bind(...(sessionId ? [id, sessionId, id] : [id, id])),
+             WHERE v.legislator_id = ? AND v.vote IN (1, 2)`,
+        ).bind(sessionId, id, sessionId, sessionId, id),
     ]);
 
     if (profile.results.length === 0) return c.json({ error: 'not found' }, 404);
@@ -219,9 +240,11 @@ app.get('/api/legislators/:id', async (c) => {
             absent: tally_by_vote['4'],
         },
         party_line: pl?.total ? Math.round((pl.aligned / pl.total) * 100) : null,
+        session_id: sessionId,
     });
 });
 
+// ── legislator vote history ─────────────────────────────────────────────────
 app.get('/api/legislators/:id/votes', async (c) => {
     const db = c.env.la_vote_tracker;
     const id = Number(c.req.param('id'));
@@ -232,12 +255,12 @@ app.get('/api/legislators/:id/votes', async (c) => {
         limit: limitStr, offset: offsetStr,
     } = c.req.query();
 
-    // Binds are appended in two clusters: (a) the ? for the legislator join, then (b) WHERE filters.
-    // Keep the JOIN bind first so the ordering can't drift if filters reshape.
+    // Binds appended in two clusters: legislator filter first, then WHERE filters,
+    // then LIMIT/OFFSET. Order preserved as cleanly as possible.
     const binds: (string | number)[] = [id];
     const where: string[] = [];
     if (session_id) {
-        where.push('b.session_id = ?');
+        where.push('rc.session_id = ?');
         binds.push(Number(session_id));
     }
     if (chamber === 'H' || chamber === 'S') {
@@ -279,17 +302,17 @@ app.get('/api/legislators/:id/votes', async (c) => {
 
     const sql = `
         SELECT
-            rc.roll_call_id, rc.date, rc.chamber, rc.description, rc.vote_category,
+            rc.id AS roll_call_id, rc.date, rc.chamber, rc.description, rc.vote_category,
             rc.yea, rc.nay, rc.nv, rc.absent, rc.total, rc.passed, rc.margin,
             rc.pdf_doc_id,
-            b.bill_id, b.bill_number, b.title,
+            b.id AS bill_id, b.bill_number, b.title,
             v.vote AS cast_vote
         FROM votes v
-        JOIN roll_calls rc ON rc.roll_call_id = v.roll_call_id
-        JOIN bills b       ON b.bill_id      = rc.bill_id
-        WHERE v.people_id = ?
+        JOIN roll_calls rc ON rc.id = v.roll_call_id
+        JOIN bills b       ON b.id  = rc.bill_id
+        WHERE v.legislator_id = ?
         ${where.length > 0 ? 'AND ' + where.join(' AND ') : ''}
-        ORDER BY rc.date DESC, rc.roll_call_id DESC
+        ORDER BY rc.date DESC, rc.id DESC
         LIMIT ? OFFSET ?
     `;
     const { results } = await db.prepare(sql).bind(...binds).all();
@@ -297,23 +320,37 @@ app.get('/api/legislators/:id/votes', async (c) => {
     return c.json({ votes: results, limit, offset });
 });
 
+// ── roll-call detail ────────────────────────────────────────────────────────
 app.get('/api/rollcalls/:id', async (c) => {
     const db = c.env.la_vote_tracker;
     const id = Number(c.req.param('id'));
     if (!Number.isFinite(id)) return c.json({ error: 'bad id' }, 400);
 
+    // The member list joins legislator_sessions for the same session as the roll
+    // call so role/party/district reflect what they were AT THE TIME, not current.
     const [head, members] = await db.batch([
         db.prepare(
-            `SELECT rc.*, b.bill_number, b.title, s.name AS session_name
+            `SELECT rc.id AS roll_call_id, rc.bill_id, rc.date, rc.chamber, rc.description,
+                    rc.vote_category, rc.yea, rc.nay, rc.nv, rc.absent, rc.total,
+                    rc.passed, rc.margin, rc.pdf_doc_id,
+                    b.bill_number, b.title,
+                    s.name AS session_name, s.id AS session_id
              FROM roll_calls rc
-             JOIN bills b      ON b.bill_id      = rc.bill_id
-             JOIN sessions s   ON s.session_id   = b.session_id
-             WHERE rc.roll_call_id = ?`,
+             JOIN bills b    ON b.id = rc.bill_id
+             JOIN sessions s ON s.id = rc.session_id
+             WHERE rc.id = ?`,
         ).bind(id),
         db.prepare(
-            `SELECT v.vote, l.people_id, l.first_name, l.last_name, l.suffix, l.nickname,
-                    l.party, l.role, l.district, l.source
-             FROM votes v JOIN legislators l ON l.people_id = v.people_id
+            `SELECT v.vote,
+                    l.id AS legislator_id, l.chamber, l.source_id,
+                    l.first_name, l.last_name, l.suffix, l.nickname,
+                    l.source,
+                    ls.role, ls.party, ls.district
+             FROM votes v
+             JOIN legislators l ON l.id = v.legislator_id
+             JOIN roll_calls rc ON rc.id = v.roll_call_id
+             LEFT JOIN legislator_sessions ls
+                ON ls.legislator_id = l.id AND ls.session_id = rc.session_id
              WHERE v.roll_call_id = ?
              ORDER BY l.last_name, l.first_name`,
         ).bind(id),
@@ -324,6 +361,7 @@ app.get('/api/rollcalls/:id', async (c) => {
     return c.json({ roll_call: head.results[0], members: members.results });
 });
 
+// ── floor agenda passthrough ────────────────────────────────────────────────
 app.get('/api/agenda/:chamber', async (c) => {
     const raw = c.req.param('chamber').toUpperCase();
     if (raw !== 'H' && raw !== 'S') return c.json({ error: 'chamber must be H or S' }, 400);
@@ -332,6 +370,7 @@ app.get('/api/agenda/:chamber', async (c) => {
     return c.json(result);
 });
 
+// ── feedback ────────────────────────────────────────────────────────────────
 const CATEGORY_LABELS: Record<string, string> = {
     representative: 'Representative info',
     vote: 'Vote info',

@@ -1,16 +1,18 @@
 export type Legislator = {
-    people_id: number;
-    first_name: string;
-    middle_name: string | null;
+    id: number;
+    chamber: 'H' | 'S';
+    source_id: number | null;            // null for pdf-only legislators
+    first_name: string | null;
     last_name: string;
     suffix: string | null;
     nickname: string | null;
-    party: string | null;
-    role: string | null;
-    district: string | null;
-    active: number;
     source?: 'roster' | 'pdf' | null;
-    term_source?: 'official' | 'wikipedia' | 'derived' | null;
+    // Per-session fields — joined from legislator_sessions for the scoped session.
+    // Null when no membership row exists for the scoped session (pdf-only across-the-board).
+    role?: string | null;                // 'Sen' | 'Rep'
+    party?: 'R' | 'D' | 'I' | null;
+    district?: number | null;
+    active?: number | null;
     term_start?: string | null;
     term_end?: string | null;
     year_elected?: number | null;
@@ -34,24 +36,38 @@ export type LegislatorVoteRow = {
 
 export type RollCallMember = {
     vote: 1 | 2 | 3 | 4;
-    people_id: number;
-    first_name: string;
+    legislator_id: number;
+    chamber: 'H' | 'S';
+    source_id: number | null;
+    first_name: string | null;
     last_name: string;
     suffix: string | null;
     nickname: string | null;
-    party: string | null;
-    role: string | null;
-    district: string | null;
     source?: 'roster' | 'pdf' | null;
+    // Per-session at the time of the roll call (from legislator_sessions).
+    role?: string | null;
+    party?: 'R' | 'D' | 'I' | null;
+    district?: number | null;
 };
 
-export function formatName(l: { first_name: string; last_name: string; suffix: string | null; nickname?: string | null }) {
+export type Session = {
+    id: number;
+    name: string;
+    year: number;
+    type: 'regular' | 'special';
+    start_date: string | null;
+    end_date: string | null;
+    map_vintage: string;
+};
+
+export function formatName(l: { first_name: string | null; last_name: string; suffix: string | null; nickname?: string | null }) {
     const nick = l.nickname ? ` "${l.nickname}"` : '';
     const suffix = l.suffix ? `, ${l.suffix}` : '';
-    return `${l.last_name}${suffix}, ${l.first_name}${nick}`;
+    const first = l.first_name ?? '';
+    return first ? `${l.last_name}${suffix}, ${first}${nick}` : `${l.last_name}${suffix}`;
 }
 
-export function partyColor(p: string | null) {
+export function partyColor(p: string | null | undefined) {
     if (p === 'D') return 'var(--party-d)';
     if (p === 'R') return 'var(--party-r)';
     if (p === 'I') return 'var(--party-i)';
@@ -70,14 +86,14 @@ export function voteColor(v: number) {
 // "24ES" -> "2024 Extraordinary Session"
 // "24ES2" -> "2024 2nd Extraordinary Session"
 // Anything else -> fall back to raw `name`.
-export function formatSessionName(name: string, year_start: number): string {
+export function formatSessionName(name: string, year: number): string {
     const tail = name.replace(/^\d+/, '');
-    if (tail === 'RS') return `${year_start} Regular Session`;
+    if (tail === 'RS') return `${year} Regular Session`;
     const esMatch = tail.match(/^ES(\d*)$/);
     if (esMatch) {
         const n = esMatch[1] ? Number(esMatch[1]) : 1;
         const ord = ['1st', '2nd', '3rd', '4th', '5th', '6th'][n - 1] ?? `${n}th`;
-        return `${year_start} ${ord} Extraordinary Session`;
+        return `${year} ${ord} Extraordinary Session`;
     }
     return name;
 }

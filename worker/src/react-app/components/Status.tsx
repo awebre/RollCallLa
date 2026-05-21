@@ -24,12 +24,12 @@ export function Status() {
 
   useEffect(() => {
     const url = current
-      ? `/api/status?session_id=${current.session_id}`
+      ? `/api/status?session_id=${current.id}`
       : "/api/status";
     fetch(url)
       .then((r) => r.json() as Promise<StatusData>)
       .then(setData);
-  }, [current?.session_id]);
+  }, [current?.id]);
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), TICK_MS);
