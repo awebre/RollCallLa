@@ -256,6 +256,14 @@ export function ChamberAgenda({ chamber, showEmpty }: { chamber: "H" | "S"; show
             Live
           </span>
         )}
+        {!agenda.in_progress && !agenda.adjourned && agenda.date && (
+          <span
+            className="inline-flex items-center rounded-full px-2 py-0.5 font-sans text-[0.68rem] font-semibold uppercase tracking-wide text-(--app-link-ext)"
+            style={{ backgroundColor: "color-mix(in srgb, var(--app-link-ext) 10%, transparent)" }}
+          >
+            Scheduled
+          </span>
+        )}
         {agenda.adjourned && (
           <span className="inline-flex items-center rounded-full px-2 py-0.5 font-sans text-[0.68rem] font-semibold uppercase tracking-wide text-(--app-text-muted) border border-(--app-border-input)">
             Adjourned
