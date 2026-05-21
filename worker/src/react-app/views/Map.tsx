@@ -57,7 +57,7 @@ function loadZipDistricts(vintage: string): Promise<Record<string, ZipEntry>> {
 
 export function DistrictMap() {
   const { current: currentSession } = useSession();
-  const sessionId = currentSession?.session_id ?? null;
+  const sessionId = currentSession?.id ?? null;
   const vintage = currentSession?.map_vintage ?? "2022";
   const [chamber, setChamber] = useState<Chamber>("H");
   const [legislators, setLegislators] = useState<Legislator[]>([]);
@@ -116,7 +116,7 @@ export function DistrictMap() {
         const at = a.term_start ?? "";
         const bt = b.term_start ?? "";
         if (at !== bt) return bt.localeCompare(at);
-        return a.people_id - b.people_id;
+        return a.id - b.id;
       });
     }
     return m;
@@ -657,7 +657,7 @@ export function DistrictMap() {
                 <ol className="m-0 list-none p-0">
                   {selectedList.map((l, i) => (
                     <li
-                      key={l.people_id}
+                      key={l.id}
                       className={`py-[0.6rem] ${i === 0 ? "" : "border-t border-(--app-border-warm)"}`}
                     >
                       <HolderRow leg={l} compact />
@@ -735,7 +735,7 @@ function HolderRow({
   return (
     <>
       <h3 className={compact ? "mb-[0.15rem] mt-0 text-[1.1rem]" : "mb-1 mt-2 text-[1.4rem]"}>
-        <Link href={`/legislator/${leg.people_id}`} className="text-(--app-link)">
+        <Link href={`/legislator/${leg.id}`} className="text-(--app-link)">
           {formatName(leg)}
         </Link>
       </h3>
@@ -751,7 +751,7 @@ function HolderRow({
         </div>
       )}
       {!compact && (
-        <Link href={`/legislator/${leg.people_id}`} className="mt-3 inline-block text-(--app-link-navy)">
+        <Link href={`/legislator/${leg.id}`} className="mt-3 inline-block text-(--app-link-navy)">
           See voting record →
         </Link>
       )}

@@ -8,7 +8,7 @@ import { partyColorClass } from "../style/color-classes";
 
 export function Roster() {
   const { current } = useSession();
-  const sessionId = current?.session_id ?? null;
+  const sessionId = current?.id ?? null;
   const [legislators, setLegislators] = useState<Legislator[]>([]);
   const [loading, setLoading] = useState(true);
   const [chamber, setChamber] = useState<"" | "H" | "S">("");
@@ -83,17 +83,14 @@ export function Roster() {
           <tbody>
             {legislators.map((l) => (
               <tr
-                key={l.people_id}
+                key={l.id}
                 className="border-b border-(--app-border-row)"
               >
                 <td className="px-1 py-[0.4rem]">
-                  <Link href={`/legislator/${l.people_id}`} className="text-(--app-link)">
+                  <Link href={`/legislator/${l.id}`} className="text-(--app-link)">
                     {formatName(l)}
                   </Link>
-                  <ProvenanceBadge
-                    source={l.source}
-                    term_source={l.term_source}
-                  />
+                  <ProvenanceBadge source={l.source} />
                 </td>
                 <td
                   className={`px-1 py-[0.4rem] font-semibold ${partyColorClass(l.party)}`}

@@ -111,10 +111,10 @@ export function RollCallDetail({ id }: { id: number }) {
             <ul className="mt-2 mb-0 list-none p-0 font-mono text-[0.85rem]">
               {byVote[v].map((m) => (
                 <li
-                  key={m.people_id}
+                  key={m.legislator_id}
                   className="border-b border-(--app-border-divider) py-[0.15rem]"
                 >
-                  <Link href={`/legislator/${m.people_id}`} className="text-(--app-link)">
+                  <Link href={`/legislator/${m.legislator_id}`} className="text-(--app-link)">
                     {formatName(m)}
                   </Link>
                   <span
