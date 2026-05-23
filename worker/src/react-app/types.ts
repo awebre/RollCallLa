@@ -96,6 +96,37 @@ export function voteColor(v: number) {
     return 'var(--vote-absent)';
 }
 
+export type Committee = {
+    id: number;
+    slug: string;
+    name: string;
+    chamber: 'H' | 'S' | 'J';
+    url: string;
+    member_count?: number;
+    republican_count?: number;
+    democrat_count?: number;
+    chair_legislator_id?: number | null;
+    chair_last_name?: string | null;
+    chair_first_name?: string | null;
+    chair_suffix?: string | null;
+};
+
+export type CommitteeMembership = {
+    committee_id: number;
+    committee_name: string;
+    committee_chamber: 'H' | 'S' | 'J';
+    committee_url: string;
+    role: 'chair' | 'vice_chair' | 'member' | 'interim' | 'ex_officio';
+};
+
+export const COMMITTEE_ROLE_LABEL: Record<string, string> = {
+    chair:       'Chair',
+    vice_chair:  'Vice Chair',
+    member:      'Member',
+    interim:     'Interim',
+    ex_officio:  'Ex Officio',
+};
+
 // "24RS" -> "2024 Regular Session"
 // "24ES" -> "2024 Extraordinary Session"
 // "24ES2" -> "2024 2nd Extraordinary Session"

@@ -430,6 +430,140 @@ app.get('/api/rollcalls/:id', async (c) => {
     return c.json({ roll_call: head.results[0], members: members.results });
 });
 
+// ── committees list ──────────────────────────────────────────────────────────
+// Returns committees filtered by chamber, with member count, party breakdown,
+// and chair info for the session.  CTEs compute party counts and chair lookup
+// separately so the main query stays a simple join.
+app.get('/api/committees', async (c) => {
+    const db = c.env.la_vote_tracker;
+    const { chamber, session_id } = c.req.query();
+    let sessionId = Number(session_id) || null;
+
+    if (sessionId === null) {
+        const latest = await db.prepare(
+            `SELECT id FROM sessions ORDER BY year DESC, id DESC LIMIT 1`,
+        ).first<{ id: number }>();
+        sessionId = latest?.id ?? null;
+    }
+
+    const chamberFilter = (chamber === 'H' || chamber === 'S' || chamber === 'J') ? chamber : null;
+
+    const sql = `
+        WITH active AS (
+            SELECT cm.committee_id, cm.legislator_id, cm.role
+            FROM committee_memberships cm
+            WHERE cm.session_id = ? AND cm.valid_to IS NULL
+        ),
+        party_counts AS (
+            SELECT a.committee_id,
+                   COUNT(*)                                              AS member_count,
+                   SUM(CASE WHEN ls.party = 'R' THEN 1 ELSE 0 END)     AS republican_count,
+                   SUM(CASE WHEN ls.party = 'D' THEN 1 ELSE 0 END)     AS democrat_count
+            FROM active a
+            LEFT JOIN legislator_sessions ls
+                ON ls.legislator_id = a.legislator_id AND ls.session_id = ?
+            GROUP BY a.committee_id
+        ),
+        chair_info AS (
+            SELECT a.committee_id,
+                   l.id    AS chair_legislator_id,
+                   l.last_name  AS chair_last_name,
+                   l.first_name AS chair_first_name,
+                   l.suffix     AS chair_suffix
+            FROM active a
+            JOIN legislators l ON l.id = a.legislator_id
+            WHERE a.role = 'chair'
+        )
+        SELECT c.id, c.slug, c.name, c.chamber, c.url,
+               COALESCE(pc.member_count,     0) AS member_count,
+               COALESCE(pc.republican_count, 0) AS republican_count,
+               COALESCE(pc.democrat_count,   0) AS democrat_count,
+               ci.chair_legislator_id,
+               ci.chair_last_name,
+               ci.chair_first_name,
+               ci.chair_suffix
+        FROM committees c
+        LEFT JOIN party_counts pc ON pc.committee_id = c.id
+        LEFT JOIN chair_info   ci ON ci.committee_id = c.id
+        ${chamberFilter ? 'WHERE c.chamber = ?' : ''}
+        ORDER BY c.name
+    `;
+    const binds: (string | number)[] = [sessionId ?? 0, sessionId ?? 0];
+    if (chamberFilter) binds.push(chamberFilter);
+    const { results } = await db.prepare(sql).bind(...binds).all();
+    c.header('cache-control', CACHE);
+    return c.json({ committees: results, session_id: sessionId });
+});
+
+// ── committee detail (members) ────────────────────────────────────────────────
+app.get('/api/committees/:id', async (c) => {
+    const db = c.env.la_vote_tracker;
+    const id = Number(c.req.param('id'));
+    if (!Number.isFinite(id)) return c.json({ error: 'bad id' }, 400);
+    let sessionId = Number(c.req.query('session_id')) || null;
+
+    if (sessionId === null) {
+        const latest = await db.prepare(
+            `SELECT id FROM sessions ORDER BY year DESC, id DESC LIMIT 1`,
+        ).first<{ id: number }>();
+        sessionId = latest?.id ?? null;
+    }
+
+    const [committee, members] = await db.batch([
+        db.prepare(`SELECT id, slug, name, chamber, url FROM committees WHERE id = ?`).bind(id),
+        db.prepare(
+            `SELECT cm.role,
+                    l.id AS legislator_id, l.first_name, l.last_name, l.suffix, l.nickname, l.source,
+                    ls.party, ls.district
+             FROM committee_memberships cm
+             JOIN legislators l ON l.id = cm.legislator_id
+             LEFT JOIN legislator_sessions ls
+                 ON ls.legislator_id = l.id AND ls.session_id = ?
+             WHERE cm.committee_id = ? AND cm.session_id = ? AND cm.valid_to IS NULL
+             ORDER BY
+                 CASE cm.role WHEN 'chair' THEN 0 WHEN 'vice_chair' THEN 1
+                              WHEN 'member' THEN 2 WHEN 'interim' THEN 3
+                              WHEN 'ex_officio' THEN 4 ELSE 5 END,
+                 l.last_name, l.first_name`,
+        ).bind(sessionId, id, sessionId),
+    ]);
+
+    if (committee.results.length === 0) return c.json({ error: 'not found' }, 404);
+    c.header('cache-control', CACHE);
+    return c.json({ committee: committee.results[0], members: members.results, session_id: sessionId });
+});
+
+// ── legislator committees ─────────────────────────────────────────────────────
+app.get('/api/legislators/:id/committees', async (c) => {
+    const db = c.env.la_vote_tracker;
+    const id = Number(c.req.param('id'));
+    if (!Number.isFinite(id)) return c.json({ error: 'bad id' }, 400);
+    let sessionId = Number(c.req.query('session_id')) || null;
+
+    if (sessionId === null) {
+        const latest = await db.prepare(
+            `SELECT id FROM sessions ORDER BY year DESC, id DESC LIMIT 1`,
+        ).first<{ id: number }>();
+        sessionId = latest?.id ?? null;
+    }
+
+    const { results } = await db.prepare(
+        `SELECT cm.role, c.id AS committee_id, c.name AS committee_name,
+                c.chamber AS committee_chamber, c.url AS committee_url
+         FROM committee_memberships cm
+         JOIN committees c ON c.id = cm.committee_id
+         WHERE cm.legislator_id = ? AND cm.session_id = ? AND cm.valid_to IS NULL
+         ORDER BY
+             CASE cm.role WHEN 'chair' THEN 0 WHEN 'vice_chair' THEN 1
+                          WHEN 'member' THEN 2 WHEN 'interim' THEN 3
+                          WHEN 'ex_officio' THEN 4 ELSE 5 END,
+             c.name`,
+    ).bind(id, sessionId).all();
+
+    c.header('cache-control', CACHE);
+    return c.json({ committees: results, session_id: sessionId });
+});
+
 // ── floor agenda passthrough ────────────────────────────────────────────────
 app.get('/api/agenda/:chamber', async (c) => {
     const raw = c.req.param('chamber').toUpperCase();

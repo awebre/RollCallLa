@@ -107,6 +107,14 @@ jobs:
       - name: Push leadership to remote D1
         run: npx wrangler d1 execute la_vote_tracker --remote --file /tmp/leadership.sql
 
+      # Scrape committee membership — must run after rosters so (chamber, source_id)
+      # lookups resolve.  Delete-then-insert per committee+session clears stale members.
+      - name: Scrape committee membership
+        run: node --experimental-strip-types scripts/scrape-committees.mjs "$SESSION" /tmp/committees.sql
+
+      - name: Push committee membership to remote D1
+        run: npx wrangler d1 execute la_vote_tracker --remote --file /tmp/committees.sql
+
       - name: Scrape bills + pipeline status
         run: node --experimental-strip-types scripts/scrape-bills.mjs "$SESSION" "" /tmp/bills.sql
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Bill } from "../types";
 import { useSession } from "../SessionContext";
+import { ChamberToggle } from "../components/ChamberToggle";
 
 // Vocabulary matches bills.pipeline_stage CHECK on the server.
 const STAGE_OPTIONS: { value: Bill["pipeline_stage"]; label: string }[] = [
@@ -86,6 +87,7 @@ export function Bills() {
       </p>
 
       <div className="mt-6 flex flex-wrap gap-3">
+        <ChamberToggle showAll value={chamber} onChange={setChamber} />
         <input
           type="search"
           placeholder="Search by number or title…"
@@ -93,15 +95,6 @@ export function Bills() {
           onChange={(e) => setQ(e.target.value)}
           className="min-w-60 flex-1 border border-(--app-border-input) bg-(--bg) px-3 py-2 text-base text-(--app-ink)"
         />
-        <select
-          value={chamber}
-          onChange={(e) => setChamber(e.target.value as "H" | "S" | "")}
-          className="border border-(--app-border-input) bg-(--app-surface) px-2 py-2 text-(--app-ink)"
-        >
-          <option value="">All chambers</option>
-          <option value="H">House</option>
-          <option value="S">Senate</option>
-        </select>
         <select
           value={type}
           onChange={(e) => setType(e.target.value)}

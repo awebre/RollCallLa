@@ -1,25 +1,35 @@
 type Chamber = "H" | "S";
+type ChamberOrAll = "" | "H" | "S";
 
-type ChamberToggleProps = {
-  value: Chamber;
-  onChange: (c: Chamber) => void;
-  /** Optional badge count shown next to each label */
-  countH?: number;
-  countS?: number;
-};
+type ChamberToggleBase = { countH?: number; countS?: number };
+type ChamberToggleProps =
+  | (ChamberToggleBase & { showAll: true; value: ChamberOrAll; onChange: (c: ChamberOrAll) => void })
+  | (ChamberToggleBase & { showAll?: false; value: Chamber; onChange: (c: Chamber) => void });
 
-export function ChamberToggle({ value, onChange, countH, countS }: ChamberToggleProps) {
+export function ChamberToggle({ value, onChange, countH, countS, ...rest }: ChamberToggleProps) {
+  const showAll = "showAll" in rest ? rest.showAll : false;
   return (
     <div
       role="tablist"
       aria-label="Chamber"
       className="inline-flex flex-none gap-0.5 rounded-lg border border-(--app-navy-border) bg-(--app-navy-bg) p-0.75"
     >
+      {showAll && (
+        <button
+          type="button"
+          role="tab"
+          aria-selected={value === ""}
+          onClick={() => (onChange as (c: ChamberOrAll) => void)("")}
+          className={btnClass(value === "")}
+        >
+          All
+        </button>
+      )}
       <button
         type="button"
         role="tab"
         aria-selected={value === "H"}
-        onClick={() => onChange("H")}
+        onClick={() => onChange("H" as Chamber & ChamberOrAll)}
         className={btnClass(value === "H")}
       >
         House
@@ -31,7 +41,7 @@ export function ChamberToggle({ value, onChange, countH, countS }: ChamberToggle
         type="button"
         role="tab"
         aria-selected={value === "S"}
-        onClick={() => onChange("S")}
+        onClick={() => onChange("S" as Chamber & ChamberOrAll)}
         className={btnClass(value === "S")}
       >
         Senate
