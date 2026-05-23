@@ -7,6 +7,7 @@ import { RollCallDetail } from './views/RollCallDetail';
 import { DistrictMap } from './views/Map';
 import { AdminView } from './views/Admin';
 import { AgendaView } from './views/AgendaView';
+import { CommitteesView } from './views/Committees';
 import { Status } from './components/Status';
 import { SessionPicker } from './components/SessionPicker';
 import { SessionProvider, useSession } from './SessionContext';
@@ -54,6 +55,7 @@ function Shell() {
                         <RosterNavLink />
                         <BillsNavLink />
                         <AgendaNavLink />
+                        <CommitteesNavLink />
                         <AdminNavLink />
                         <LogoutNavButton />
                     </nav>
@@ -78,6 +80,10 @@ function Shell() {
                             }}
                         </Route>
                         <Route path="/agenda" component={() => <AgendaView chamber="H" />} />
+                        <Route path="/committees/:id">
+                            {(params) => <CommitteesView committeeId={Number(params.id)} />}
+                        </Route>
+                        <Route path="/committees" component={() => <CommitteesView />} />
                         <Route><Redirect to="/map" /></Route>
                     </Switch>
                 </main>
@@ -112,6 +118,12 @@ function AgendaNavLink() {
         ? `Agenda · ${params.chamber === 'H' ? 'House' : 'Senate'}`
         : 'Agenda';
     return <Link href="/agenda/H" className={navLinkClass(active)}>{label}</Link>;
+}
+
+function CommitteesNavLink() {
+    const [onList]   = useRoute('/committees');
+    const [onDetail] = useRoute('/committees/:id');
+    return <Link href="/committees" className={navLinkClass(onList || onDetail)}>Committees</Link>;
 }
 
 function AdminNavLink() {

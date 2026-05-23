@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import type { Legislator, LegislatorVoteRow } from "../types";
-import { formatName, VOTE_LABEL } from "../types";
+import type { Legislator, LegislatorVoteRow, CommitteeMembership } from "../types";
+import { formatName, VOTE_LABEL, COMMITTEE_ROLE_LABEL } from "../types";
 import { useSession } from "../SessionContext";
 import { Link } from "wouter";
 import { useFeedback } from "../FeedbackContext";
@@ -25,6 +25,7 @@ export function LegislatorDetail({ id }: { id: number }) {
   const { openFeedback } = useFeedback();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [votes, setVotes] = useState<LegislatorVoteRow[]>([]);
+  const [committees, setCommittees] = useState<CommitteeMembership[]>([]);
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState<string>("final_passage");
   const [vote, setVote] = useState<string>("");
@@ -37,6 +38,9 @@ export function LegislatorDetail({ id }: { id: number }) {
     fetch(`/api/legislators/${id}?${params.toString()}`)
       .then((r) => r.json() as Promise<Profile>)
       .then(setProfile);
+    fetch(`/api/legislators/${id}/committees?${params.toString()}`)
+      .then((r) => r.json() as Promise<{ committees: CommitteeMembership[] }>)
+      .then((d) => setCommittees(d.committees));
   }, [id, sessionId]);
 
   useEffect(() => {
@@ -138,6 +142,33 @@ export function LegislatorDetail({ id }: { id: number }) {
           Report an issue with this representative
         </button>
       </p>
+
+      {committees.length > 0 && (
+        <>
+          <div className="mt-7 mb-3 flex items-center gap-3">
+            <span className="text-[0.75rem] font-semibold uppercase tracking-widest text-(--app-text-muted)">
+              Committees
+            </span>
+            <div className="flex-1 border-t border-(--app-border-light)" />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {committees.map((cm) => (
+              <Link
+                key={cm.committee_id}
+                href={`/committees/${cm.committee_id}`}
+                className="inline-flex items-center gap-1.5 border border-(--app-border-input) px-2.5 py-1 text-[0.82rem] no-underline text-(--app-ink) hover:bg-(--app-surface-warm)"
+              >
+                {cm.committee_name}
+                {cm.role !== "member" && (
+                  <span className="text-[0.72rem] text-(--app-text-muted)">
+                    · {COMMITTEE_ROLE_LABEL[cm.role] ?? cm.role}
+                  </span>
+                )}
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
 
       {l.role && (
         <>
