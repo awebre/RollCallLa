@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 // Scrape committee membership from house.louisiana.gov and senate.la.gov.
 //
-// Discovers committees automatically from the legis.la.gov index pages
-// (chamber=H, chamber=S, chamber=m) so new committees are picked up without
-// code changes.  The committee URL is stored in D1 alongside the slug so the
-// source of truth for "which URL to scrape" lives in the database.
+// Discovers H/S committees from the chamber websites directly (plain HTML nav).
+// Misc/joint/select committees are discovered from legis.la.gov/Committees.aspx?c=m.
+// No hardcoded committee lists — new committees are picked up automatically.
 //
 // Matching: each committee page links member names to their official profiles
 // using the same source_id scheme as scrape-rosters.mjs
@@ -28,49 +27,45 @@ const OUT_PATH = process.argv[3] ?? '/tmp/committees.sql';
 
 const UA = 'Mozilla/5.0 (la-vote-tracker scraper; civic data project)';
 
-// Standing House and Senate committees are hardcoded — the legis.la.gov index
-// pages use ASP.NET JS-rendered links that aren't in the raw href attributes.
-// Standing committees change at most once per session; update this list if a
-// committee is added or renamed.  Misc/joint/select committees are discovered
-// dynamically from legis.la.gov/Committees.aspx?c=m (those use plain hrefs).
-const HOUSE_COMMITTEES = [
-    { slug: 'criminal-justice',       name: 'Administration of Criminal Justice',             url: 'https://house.louisiana.gov/H_Cmtes/CriminalJustice.aspx' },
-    { slug: 'agriculture',            name: 'Agriculture, Forestry, Aquaculture, and Rural Development', url: 'https://house.louisiana.gov/H_Cmtes/Agriculture.aspx' },
-    { slug: 'appropriations',         name: 'Appropriations',                                 url: 'https://house.louisiana.gov/H_Cmtes/Appropriations.aspx' },
-    { slug: 'civil-law',              name: 'Civil Law and Procedure',                        url: 'https://house.louisiana.gov/H_Cmtes/CivilLaw.aspx' },
-    { slug: 'commerce',               name: 'Commerce',                                       url: 'https://house.louisiana.gov/H_Cmtes/Commerce.aspx' },
-    { slug: 'education',              name: 'Education',                                      url: 'https://house.louisiana.gov/H_Cmtes/Education.aspx' },
-    { slug: 'health-and-welfare',     name: 'Health and Welfare',                             url: 'https://house.louisiana.gov/H_Cmtes/HealthAndWelfare.aspx' },
-    { slug: 'house-and-gov',          name: 'House and Governmental Affairs',                 url: 'https://house.louisiana.gov/H_Cmtes/HouseAndGov.aspx' },
-    { slug: 'insurance',              name: 'Insurance',                                      url: 'https://house.louisiana.gov/H_Cmtes/Insurance.aspx' },
-    { slug: 'judiciary',              name: 'Judiciary',                                      url: 'https://house.louisiana.gov/H_Cmtes/Judiciary.aspx' },
-    { slug: 'labor',                  name: 'Labor and Industrial Relations',                 url: 'https://house.louisiana.gov/H_Cmtes/Labor.aspx' },
-    { slug: 'municipal',              name: 'Municipal, Parochial and Cultural Affairs',      url: 'https://house.louisiana.gov/H_Cmtes/Municipal.aspx' },
-    { slug: 'natural-resources',      name: 'Natural Resources and Environment',              url: 'https://house.louisiana.gov/H_Cmtes/NaturalResources.aspx' },
-    { slug: 'retirement',             name: 'Retirement',                                     url: 'https://house.louisiana.gov/H_Cmtes/Retirement.aspx' },
-    { slug: 'transportation',         name: 'Transportation, Highways and Public Works',      url: 'https://house.louisiana.gov/H_Cmtes/Transportation.aspx' },
-    { slug: 'ways-and-means',         name: 'Ways and Means',                                 url: 'https://house.louisiana.gov/H_Cmtes/WaysAndMeans.aspx' },
-].map((c) => ({ ...c, chamber: 'H' }));
+// ── Discover H/S committees from chamber websites ────────────────────────────
+// house.louisiana.gov and senate.la.gov are plain HTML, so href extraction
+// works without a headless browser.  legis.la.gov/Committees.aspx?c=H/S uses
+// ASP.NET JS-rendered navigation and is intentionally avoided here.
+// Committee names are resolved from the individual committee pages at fetch time.
+async function discoverChamberCommittees(chamber) {
+    // House:  house.louisiana.gov/H_Cmtes/Standing.aspx  → absolute hrefs, full names in link text
+    // Senate: senate.la.gov/CommitteesStanding.aspx       → relative hrefs, full names in link text
+    const listingUrl = chamber === 'H'
+        ? 'https://house.louisiana.gov/H_Cmtes/Standing.aspx'
+        : 'https://senate.la.gov/CommitteesStanding.aspx';
+    const baseUrl = chamber === 'H'
+        ? 'https://house.louisiana.gov'
+        : 'https://senate.la.gov';
+    const linkRe = chamber === 'H'
+        ? /<a\s[^>]*href="(https?:\/\/house\.louisiana\.gov\/H_Cmtes\/([A-Za-z][A-Za-z0-9]+)\.aspx)"[^>]*>([\s\S]{1,300}?)<\/a>/gi
+        : /<a\s[^>]*href="(Sen_Committees\/([A-Za-z][A-Za-z0-9]+)\.aspx)"[^>]*>([\s\S]{1,300}?)<\/a>/gi;
 
-const SENATE_COMMITTEES = [
-    { slug: 'agriculture-forestry',   name: 'Agriculture, Forestry, Aquaculture, and Rural Development', url: 'https://senate.la.gov/Sen_Committees/AgricultureForestry' },
-    { slug: 'commerce',               name: 'Commerce, Consumer Protection and International Affairs',    url: 'https://senate.la.gov/Sen_Committees/Commerce' },
-    { slug: 'education',              name: 'Education',                                      url: 'https://senate.la.gov/Sen_Committees/Education' },
-    { slug: 'env-quality',            name: 'Environmental Quality',                          url: 'https://senate.la.gov/Sen_Committees/EnvQuality' },
-    { slug: 'finance',                name: 'Finance',                                        url: 'https://senate.la.gov/Sen_Committees/Finance' },
-    { slug: 'health-welfare',         name: 'Health and Welfare',                             url: 'https://senate.la.gov/Sen_Committees/HealthWelfare' },
-    { slug: 'insurance',              name: 'Insurance',                                      url: 'https://senate.la.gov/Sen_Committees/Insurance' },
-    { slug: 'judiciary-a',            name: 'Judiciary A',                                    url: 'https://senate.la.gov/Sen_Committees/JudiciaryA' },
-    { slug: 'judiciary-b',            name: 'Judiciary B',                                    url: 'https://senate.la.gov/Sen_Committees/JudiciaryB' },
-    { slug: 'judiciary-c',            name: 'Judiciary C',                                    url: 'https://senate.la.gov/Sen_Committees/JudiciaryC' },
-    { slug: 'labor-industrial',       name: 'Labor and Industrial Relations',                 url: 'https://senate.la.gov/Sen_Committees/LaborIndustrial' },
-    { slug: 'local-municipal',        name: 'Local and Municipal Affairs',                    url: 'https://senate.la.gov/Sen_Committees/LocalMunicipal' },
-    { slug: 'natural-resources',      name: 'Natural Resources',                              url: 'https://senate.la.gov/Sen_Committees/NaturalResources' },
-    { slug: 'retirement',             name: 'Retirement',                                     url: 'https://senate.la.gov/Sen_Committees/Retirement' },
-    { slug: 'revenue-fiscal',         name: 'Revenue and Fiscal Affairs',                     url: 'https://senate.la.gov/Sen_Committees/RevenueFiscal' },
-    { slug: 'senate-gov-affairs',     name: 'Senate and Governmental Affairs',                url: 'https://senate.la.gov/Sen_Committees/SenateGovAffairs' },
-    { slug: 'transportation',         name: 'Transportation, Highways and Public Works',      url: 'https://senate.la.gov/Sen_Committees/Transportation' },
-].map((c) => ({ ...c, chamber: 'S' }));
+    const html = await fetchText(listingUrl);
+    const seen = new Set();
+    const found = [];
+    let m;
+    while ((m = linkRe.exec(html)) !== null) {
+        const [, href, segment, linkHtml] = m;
+        const slug = toSlug(segment);
+        if (seen.has(slug)) continue;
+        seen.add(slug);
+        const url = href.startsWith('http') ? href : `${baseUrl}/${href}`;
+        const name = cleanText(linkHtml) || null;
+        found.push({ slug, url, chamber, name });
+    }
+
+    if (found.length < 5) {
+        console.error(`  [warn] Only ${found.length} ${chamber} committees discovered — check ${listingUrl}`);
+    } else {
+        console.error(`  Found ${found.length} ${chamber === 'H' ? 'House' : 'Senate'} committees`);
+    }
+    return found;
+}
 
 // Dynamic discovery only for misc/joint/select committees — these use plain
 // hrefs on legis.la.gov so the regex works.
@@ -131,6 +126,15 @@ function discoverCommitteesFromIndex(html, chamberOverride) {
         if (name) found.push({ url, slug, name, chamber: chamberOverride ?? 'J' });
     }
     return found;
+}
+
+// Extract committee name from a committee page's heading or title tag.
+function parseCommitteeName(html) {
+    const heading = html.match(/<h[123][^>]*>([^<]{10,120})<\/h[123]>/i);
+    if (heading) return cleanText(heading[1]);
+    const title = html.match(/<title>([^<]+)<\/title>/i);
+    if (title) return cleanText(title[1].split(/\s*[-|–—]\s*/)[0]);
+    return null;
 }
 
 // ── Parse member source_ids and roles from a committee page ──────────────────
@@ -256,10 +260,14 @@ function membershipDepart(committeeSlug, chamber, sourceId, memberChamber, today
 // ── Main ─────────────────────────────────────────────────────────────────────
 const TODAY = new Date().toISOString().slice(0, 10); // 'YYYY-MM-DD'
 
-// Start with all known standing committees.
-const allCommittees = [...HOUSE_COMMITTEES, ...SENATE_COMMITTEES];
+// Discover all committees dynamically — no hardcoded lists.
+console.error('Discovering House committees…');
+const houseCommittees = await discoverChamberCommittees('H');
+console.error('Discovering Senate committees…');
+const senateCommittees = await discoverChamberCommittees('S');
+const allCommittees = [...houseCommittees, ...senateCommittees];
 
-// Dynamically discover misc/joint/select committees.
+// Misc/joint/select committees from the legis.la.gov index (plain hrefs).
 console.error(`Fetching misc/joint index: ${MISC_INDEX_URL}`);
 try {
     const miscHtml = await fetchText(MISC_INDEX_URL);
@@ -305,8 +313,9 @@ for (const committee of committees) {
     const members = parseMembersFromPage(html, committee.chamber);
     console.error(`    ${members.length} members found`);
 
-    // Upsert committee metadata.
-    sqlLines.push(committeeUpsert(committee));
+    // Resolve name from the page if discovery didn't provide one (H/S committees).
+    const resolvedName = committee.name ?? parseCommitteeName(html) ?? committee.slug;
+    sqlLines.push(committeeUpsert({ ...committee, name: resolvedName }));
 
     // The scraper emits SQL — it cannot read back existing DB rows at emit time.
     // We use SQL-level logic: INSERT OR IGNORE for arrivals (idempotent if the
