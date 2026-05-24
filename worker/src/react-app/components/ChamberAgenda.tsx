@@ -396,7 +396,7 @@ export function AgendaRow({
       <span className={`shrink-0 font-semibold ${isPast ? "line-through" : ""}`}>
         <BillLink
           billNumber={item.bill_number}
-          sessionName={sessionName}
+          sessionName={sessionName ?? null}
           className={isPast ? "text-(--app-text-muted)" : "text-(--app-link-ext)"}
         />
       </span>
