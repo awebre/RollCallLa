@@ -113,10 +113,10 @@ async function parsePdfText(buf) {
 }
 
 // Extract the digest abstract from full PDF text.
-// House bills: abstract is the paragraph after "Abstract:" until "Present law"
-//   or "This act" or end of first ~2 pages of text.
-// Senate bills: abstract is the prose after the bill/session header line until
-//   "Summary of Amendments", "Present law", "This bill", or end of first ~2 pages.
+// House bills: explicit "Abstract:" label precedes the one-liner abstract.
+// Senate bills: no "Abstract:" label. After "DIGEST", the header line is
+//   "<Type> <Num> <Version>   <Year> Regular Session   <Author>", then the
+//   abstract text runs until a statute citation like "(Amends R.S. ...)".
 function extractAbstract(fullText, billNumber) {
     const text = fullText.replace(/\s+/g, ' ').trim();
 
@@ -128,19 +128,19 @@ function extractAbstract(fullText, billNumber) {
         return (end === -1 ? after.slice(0, 2000) : after.slice(0, end)).trim() || null;
     }
 
-    // Senate: find the header line "<BillNum> <Session>" then take prose after it
-    const headerRe = new RegExp(
-        String(billNumber).replace(/\d+/, '\\d+') + '\\s+(?:Regular|Special)\\s+Session',
-        'i',
-    );
-    const headerIdx = text.search(headerRe);
-    const startIdx = headerIdx !== -1
-        ? text.indexOf(' ', headerIdx + billNumber.length) + 1
-        : 0;
-    const after = text.slice(startIdx).trimStart();
-    const end = after.search(/\bSummary\s+of\s+Amendments\b|\bPresent\s+law\b|\bThis\s+bill\b|\bThis\s+act\b/i);
-    const candidate = (end === -1 ? after.slice(0, 2000) : after.slice(0, end)).trim();
-    return candidate.length > 20 ? candidate : null;
+    // Senate: find "Regular Session" or "Special Session", then skip the
+    // author name (single \S+ word after session text) to reach abstract.
+    // PDF text: "... 2026 Regular Session   Jenkins Present law relative to..."
+    const sessionMatch = text.match(/(?:Regular|Special)\s+Session\s+(\S+)\s+([\s\S]{10,})/i);
+    if (sessionMatch) {
+        const abstract = sessionMatch[2].trim();
+        // Stop at statute citation line
+        const end = abstract.search(/\s*\((?:Amends|Adds|Repeals|Creates|Enacts)/i);
+        const candidate = (end === -1 ? abstract.slice(0, 2000) : abstract.slice(0, end)).trim();
+        return candidate.length > 20 ? candidate : null;
+    }
+
+    return null;
 }
 
 // Parse digest links from BillInfo.aspx HTML.
