@@ -6,7 +6,7 @@ import { Link } from "wouter";
 import { useFeedback } from "../FeedbackContext";
 import { ProvenanceBadge } from "../components/ProvenanceBadge";
 import { TruncatedText } from "../components/TruncatedText";
-import { BillLink } from "../components/BillLink";
+import { BillInternalLink } from "../components/BillInternalLink";
 import {
   castVoteColorClass,
   partyColorClass,
@@ -263,7 +263,7 @@ export function LegislatorDetail({ id }: { id: number }) {
               >
                 <td className="px-1 py-[0.4rem] whitespace-nowrap">{v.date}</td>
                 <td className="px-1 py-[0.4rem]">
-                  <BillLink billNumber={v.bill_number} sessionName={current?.name ?? null} />
+                  <BillInternalLink id={v.bill_id} billNumber={v.bill_number} />
                 </td>
                 <td className="px-1 py-[0.4rem]">
                   {v.title ? (

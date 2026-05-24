@@ -217,6 +217,48 @@ app.get('/api/bills', async (c) => {
     });
 });
 
+// ── bill detail ─────────────────────────────────────────────────────────────
+app.get('/api/bills/:id', async (c) => {
+    const db = c.env.la_vote_tracker;
+    const id = Number(c.req.param('id'));
+    if (!Number.isFinite(id)) return c.json({ error: 'bad id' }, 400);
+
+    const [bill, referrals, rollCalls] = await db.batch([
+        db.prepare(
+            `SELECT b.id, b.bill_number, b.bill_type, b.originating_chamber,
+                    b.title, b.docs_id, b.pipeline_stage, b.next_chamber,
+                    b.status_text, b.session_name, b.session_id,
+                    s.year AS session_year, s.name AS session_label
+             FROM bills b
+             JOIN sessions s ON s.id = b.session_id
+             WHERE b.id = ?`,
+        ).bind(id),
+        db.prepare(
+            `SELECT bcr.id AS referral_id, bcr.referral_date, bcr.discharge_date, bcr.outcome,
+                    c.id AS committee_id, c.name AS committee_name, c.chamber AS committee_chamber
+             FROM bill_committee_referrals bcr
+             JOIN committees c ON c.id = bcr.committee_id
+             WHERE bcr.bill_id = ?
+             ORDER BY bcr.referral_date`,
+        ).bind(id),
+        db.prepare(
+            `SELECT roll_call_id, date, chamber, description, vote_category,
+                    yea, nay, nv, absent, passed, margin
+             FROM roll_calls
+             WHERE bill_id = ?
+             ORDER BY date, roll_call_id`,
+        ).bind(id),
+    ]);
+
+    if (bill.results.length === 0) return c.json({ error: 'not found' }, 404);
+    c.header('cache-control', CACHE);
+    return c.json({
+        bill: bill.results[0],
+        referrals: referrals.results,
+        roll_calls: rollCalls.results,
+    });
+});
+
 // ── legislator detail ───────────────────────────────────────────────────────
 app.get('/api/legislators/:id', async (c) => {
     const db = c.env.la_vote_tracker;

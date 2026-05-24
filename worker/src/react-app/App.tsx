@@ -8,6 +8,7 @@ import { DistrictMap } from './views/Map';
 import { AdminView } from './views/Admin';
 import { AgendaView } from './views/AgendaView';
 import { CommitteesView } from './views/Committees';
+import { BillDetail } from './views/BillDetail';
 import { Status } from './components/Status';
 import { SessionPicker } from './components/SessionPicker';
 import { SessionProvider, useSession } from './SessionContext';
@@ -65,6 +66,9 @@ function Shell() {
                         <Route path="/map" component={DistrictMap} />
                         <Route path="/roster" component={Roster} />
                         <Route path="/bills" component={Bills} />
+                        <Route path="/bills/:id">
+                            {(params) => <BillDetail id={Number(params.id)} />}
+                        </Route>
                         <Route path="/legislator/:id">
                             {(params) => <LegislatorDetail id={Number(params.id)} />}
                         </Route>
@@ -108,8 +112,9 @@ function RosterNavLink() {
 }
 
 function BillsNavLink() {
-    const [onBills] = useRoute('/bills');
-    return <Link href="/bills" className={navLinkClass(onBills)}>Bills</Link>;
+    const [onBills]  = useRoute('/bills');
+    const [onDetail] = useRoute('/bills/:id');
+    return <Link href="/bills" className={navLinkClass(onBills || onDetail)}>Bills</Link>;
 }
 
 function AgendaNavLink() {
