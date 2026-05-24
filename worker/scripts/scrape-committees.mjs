@@ -236,8 +236,14 @@ function membershipArrive(committeeSlug, chamber, sourceId, memberChamber, role,
     const sessionIdExpr    = `(SELECT id FROM sessions WHERE name=${escSql(SESSION)})`;
     return (
         `INSERT OR IGNORE INTO committee_memberships` +
-        ` (committee_id, legislator_id, session_id, role, valid_from, valid_to) VALUES (` +
-        [committeeIdExpr, legislatorIdExpr, sessionIdExpr, escSql(role), escSql(today), 'NULL'].join(', ') +
+        ` (committee_id, legislator_id, session_id, role, valid_from, valid_to)` +
+        ` SELECT ${[committeeIdExpr, legislatorIdExpr, sessionIdExpr, escSql(role), escSql(today), 'NULL'].join(', ')}` +
+        ` WHERE NOT EXISTS (` +
+        `SELECT 1 FROM committee_memberships` +
+        ` WHERE committee_id=${committeeIdExpr}` +
+        ` AND legislator_id=${legislatorIdExpr}` +
+        ` AND session_id=${sessionIdExpr}` +
+        ` AND valid_to IS NULL` +
         `);`
     );
 }
