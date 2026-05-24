@@ -6,6 +6,7 @@ import { Link } from "wouter";
 import { useFeedback } from "../FeedbackContext";
 import { ProvenanceBadge } from "../components/ProvenanceBadge";
 import { TruncatedText } from "../components/TruncatedText";
+import { BillLink } from "../components/BillLink";
 import {
   castVoteColorClass,
   partyColorClass,
@@ -262,18 +263,7 @@ export function LegislatorDetail({ id }: { id: number }) {
               >
                 <td className="px-1 py-[0.4rem] whitespace-nowrap">{v.date}</td>
                 <td className="px-1 py-[0.4rem]">
-                  {current ? (
-                    <a
-                      href={`https://legis.la.gov/legis/BillInfo.aspx?s=${current.name}&b=${v.bill_number.replace(/\s+/g, "")}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-(--app-link-ext)"
-                    >
-                      {v.bill_number}
-                    </a>
-                  ) : (
-                    v.bill_number
-                  )}
+                  <BillLink billNumber={v.bill_number} sessionName={current?.name ?? null} />
                 </td>
                 <td className="px-1 py-[0.4rem]">
                   {v.title ? (

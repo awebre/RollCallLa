@@ -121,6 +121,21 @@ jobs:
       - name: Push bills to remote D1
         run: npx wrangler d1 execute la_vote_tracker --remote --file /tmp/bills.sql
 
+      # Referral scraper reads bills from D1 + BillInfo.aspx action history.
+      # Emits referrals SQL and a moi worklist for the committee votes scraper.
+      - name: Scrape bill-committee referrals
+        run: node --experimental-strip-types scripts/scrape-bill-referrals.mjs "$SESSION" --out /tmp/referrals.sql --moi-list /tmp/moi-list.json
+
+      - name: Push bill-committee referrals to remote D1
+        run: npx wrangler d1 execute la_vote_tracker --remote --file /tmp/referrals.sql
+
+      # Committee vote scraper reads the moi worklist from the previous step.
+      - name: Scrape committee roll-call votes
+        run: node --experimental-strip-types scripts/scrape-committee-votes.mjs "$SESSION" --moi-list /tmp/moi-list.json --out /tmp/committee_votes.sql
+
+      - name: Push committee votes to remote D1
+        run: npx wrangler d1 execute la_vote_tracker --remote --file /tmp/committee_votes.sql
+
       # parse-rollcalls reads bills.docs_id from D1 to discover PDFs, so bills
       # must be pushed first. Output path matches the default OUT_PATH in the
       # script (which honors the --out flag if we need a different name).
