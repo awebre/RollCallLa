@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Bill } from "../types";
 import { useSession } from "../SessionContext";
 import { ChamberToggle } from "../components/ChamberToggle";
+import { BillLink } from "../components/BillLink";
 
 // Vocabulary matches bills.pipeline_stage CHECK on the server.
 const STAGE_OPTIONS: { value: Bill["pipeline_stage"]; label: string }[] = [
@@ -153,18 +154,7 @@ export function Bills() {
             {bills.map((b) => (
               <tr key={b.id} className="border-b border-(--app-border-row)">
                 <td className="px-1 py-[0.4rem] whitespace-nowrap font-semibold">
-                  {sessionName ? (
-                    <a
-                      href={`https://legis.la.gov/legis/BillInfo.aspx?s=${sessionName}&b=${b.bill_number.replace(/\s+/g, "")}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-(--app-link-ext)"
-                    >
-                      {b.bill_number} ↗
-                    </a>
-                  ) : (
-                    b.bill_number
-                  )}
+                  <BillLink billNumber={b.bill_number} sessionName={sessionName} />
                 </td>
                 <td className="px-1 py-[0.4rem] max-w-[40ch] truncate text-(--app-text-mid)" title={b.title ?? undefined}>
                   {b.title ?? <span className="text-(--app-text-subtle) italic">(no title yet)</span>}

@@ -1,5 +1,4 @@
 -- Louisiana Legislator Vote Tracker — initial schema
--- LegiScan IDs are primary keys throughout so re-ingest is idempotent via upsert.
 
 PRAGMA foreign_keys = ON;
 

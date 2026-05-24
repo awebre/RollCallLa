@@ -3,6 +3,7 @@ import type { RollCallMember } from "../types";
 import { formatName, VOTE_LABEL } from "../types";
 import { Link } from "wouter";
 import { ProvenanceBadge } from "../components/ProvenanceBadge";
+import { BillLink } from "../components/BillLink";
 import { partyColorClass, resultColorClass } from "../style/color-classes";
 
 type RollCallHead = {
@@ -79,14 +80,9 @@ export function RollCallDetail({ id }: { id: number }) {
         {head.absent} · margin {head.margin}
       </p>
       <p className="text-[0.85rem]">
-        <a
-          href={`https://legis.la.gov/legis/BillInfo.aspx?s=${head.session_name}&b=${head.bill_number.replace(/\s+/g, "")}`}
-          target="_blank"
-          rel="noreferrer"
-          className="text-(--app-link-ext)"
-        >
+        <BillLink billNumber={head.bill_number} sessionName={head.session_name}>
           {head.bill_number} on legis.la.gov ↗
-        </a>
+        </BillLink>
         {head.pdf_doc_id && (
           <>
             {"  ·  "}

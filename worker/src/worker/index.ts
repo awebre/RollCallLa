@@ -533,6 +533,35 @@ app.get('/api/committees/:id', async (c) => {
     return c.json({ committee: committee.results[0], members: members.results, session_id: sessionId });
 });
 
+// ── committee bills (referrals) ───────────────────────────────────────────────
+app.get('/api/committees/:id/bills', async (c) => {
+    const db = c.env.la_vote_tracker;
+    const id = Number(c.req.param('id'));
+    if (!Number.isFinite(id)) return c.json({ error: 'bad id' }, 400);
+    let sessionId = Number(c.req.query('session_id')) || null;
+
+    if (sessionId === null) {
+        const latest = await db.prepare(
+            `SELECT id FROM sessions ORDER BY year DESC, id DESC LIMIT 1`,
+        ).first<{ id: number }>();
+        sessionId = latest?.id ?? null;
+    }
+
+    const { results } = await db.prepare(
+        `SELECT bcr.id AS referral_id,
+                bcr.referral_date, bcr.discharge_date, bcr.outcome,
+                b.id AS bill_id, b.bill_number, b.bill_type, b.originating_chamber,
+                b.title, b.pipeline_stage
+         FROM bill_committee_referrals bcr
+         JOIN bills b ON b.id = bcr.bill_id
+         WHERE bcr.committee_id = ? AND b.session_id = ?
+         ORDER BY bcr.referral_date DESC, b.bill_number`,
+    ).bind(id, sessionId).all();
+
+    c.header('cache-control', CACHE);
+    return c.json({ referrals: results, session_id: sessionId });
+});
+
 // ── legislator committees ─────────────────────────────────────────────────────
 app.get('/api/legislators/:id/committees', async (c) => {
     const db = c.env.la_vote_tracker;

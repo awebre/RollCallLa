@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { useSession } from "../SessionContext";
 import { useDebug } from "../debug/DebugContext";
+import { BillLink } from "./BillLink";
 
 export type AgendaCategory =
   | "final_passage"
@@ -383,10 +384,6 @@ export function AgendaRow({
   const isPast    = item.status === "past";
   const isCurrent = item.status === "current";
 
-  const billLink = sessionName
-    ? `https://legis.la.gov/legis/BillInfo.aspx?s=${sessionName}&b=${item.bill_number.replace(/\s+/g, "")}`
-    : null;
-
   return (
     <div
       className={`flex items-baseline gap-x-2 px-4 py-[0.35rem] font-mono text-[0.82rem] ${
@@ -397,18 +394,11 @@ export function AgendaRow({
         <span className="shrink-0 text-[0.7rem] text-(--vote-yea)">▶</span>
       )}
       <span className={`shrink-0 font-semibold ${isPast ? "line-through" : ""}`}>
-        {billLink ? (
-          <a
-            href={billLink}
-            target="_blank"
-            rel="noreferrer"
-            className={isPast ? "text-(--app-text-muted)" : "text-(--app-link-ext)"}
-          >
-            {item.bill_number}
-          </a>
-        ) : (
-          <span className="text-(--app-ink)">{item.bill_number}</span>
-        )}
+        <BillLink
+          billNumber={item.bill_number}
+          sessionName={sessionName}
+          className={isPast ? "text-(--app-text-muted)" : "text-(--app-link-ext)"}
+        />
       </span>
       <span className="shrink-0 text-(--app-text-muted)">{item.author}</span>
       <span className="min-w-0 flex-1 truncate text-(--app-text-mid)">{item.subject}</span>
