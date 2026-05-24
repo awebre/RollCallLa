@@ -18,6 +18,12 @@ type BillDetail = {
   session_year: number;
 };
 
+type DigestSummary = {
+  docs_id: number;
+  version: string;
+  abstract: string | null;
+};
+
 type Referral = {
   referral_id: number;
   referral_date: string;
@@ -93,16 +99,18 @@ export function BillDetail({ id }: { id: number }) {
   const [bill, setBill] = useState<BillDetail | null>(null);
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [rollCalls, setRollCalls] = useState<RollCall[]>([]);
+  const [digest, setDigest] = useState<DigestSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
     fetch(`/api/bills/${id}`)
-      .then((r) => r.json() as Promise<{ bill: BillDetail; referrals: Referral[]; roll_calls: RollCall[] }>)
+      .then((r) => r.json() as Promise<{ bill: BillDetail; referrals: Referral[]; roll_calls: RollCall[]; digest: DigestSummary | null }>)
       .then((d) => {
         setBill(d.bill);
         setReferrals(d.referrals);
         setRollCalls(d.roll_calls);
+        setDigest(d.digest ?? null);
       })
       .finally(() => setLoading(false));
   }, [id]);
@@ -137,6 +145,22 @@ export function BillDetail({ id }: { id: number }) {
           View on legis.la.gov ↗
         </BillLink>
       </p>
+
+      {/* Digest abstract */}
+      {digest?.abstract && (
+        <div className="mt-5">
+          <div className="mb-2 flex items-center gap-3">
+            <span className="text-[0.72rem] font-semibold uppercase tracking-widest text-(--app-text-muted)">
+              Summary
+            </span>
+            <span className="rounded px-1.5 py-0.5 text-[0.72rem] font-semibold bg-(--app-surface-warm) text-(--app-text-muted)">
+              {digest.version}
+            </span>
+            <div className="flex-1 border-t border-(--app-border-light)" />
+          </div>
+          <p className="mt-0 text-[0.9rem] text-(--app-text-mid) leading-relaxed">{digest.abstract}</p>
+        </div>
+      )}
 
       {/* Committee referrals */}
       <Section label="Committee History" count={referrals.length}>

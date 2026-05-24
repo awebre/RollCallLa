@@ -223,7 +223,7 @@ app.get('/api/bills/:id', async (c) => {
     const id = Number(c.req.param('id'));
     if (!Number.isFinite(id)) return c.json({ error: 'bad id' }, 400);
 
-    const [bill, referrals, rollCalls] = await db.batch([
+    const [bill, referrals, rollCalls, digest] = await db.batch([
         db.prepare(
             `SELECT b.id, b.bill_number, b.bill_type, b.originating_chamber,
                     b.title, b.docs_id, b.pipeline_stage, b.next_chamber,
@@ -248,6 +248,12 @@ app.get('/api/bills/:id', async (c) => {
              WHERE bill_id = ?
              ORDER BY date, id`,
         ).bind(id),
+        db.prepare(
+            `SELECT docs_id, version, abstract
+             FROM bill_digests
+             WHERE bill_id = ?
+             ORDER BY id DESC LIMIT 1`,
+        ).bind(id),
     ]);
 
     if (bill.results.length === 0) return c.json({ error: 'not found' }, 404);
@@ -256,6 +262,7 @@ app.get('/api/bills/:id', async (c) => {
         bill: bill.results[0],
         referrals: referrals.results,
         roll_calls: rollCalls.results,
+        digest: digest.results[0] ?? null,
     });
 });
 
