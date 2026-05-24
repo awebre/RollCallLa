@@ -116,17 +116,19 @@ export function BillDetail({ id }: { id: number }) {
         <Link href="/bills" className="text-(--app-text-muted)">← all bills</Link>
       </p>
 
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="mb-1 text-[1.5rem]">{bill.bill_number}</h2>
-          <p className="mt-0 text-[0.9rem] text-(--app-text-mid)">{bill.title ?? "No title yet"}</p>
-        </div>
-        <span className={`rounded px-2 py-1 text-[0.75rem] font-semibold ${STAGE_CLASS[bill.pipeline_stage]}`}>
-          {STAGE_LABEL[bill.pipeline_stage]}
-        </span>
+      <div className="mt-1">
+        <h2 className="m-0 text-[1.5rem]">{bill.bill_number}</h2>
+        {bill.status_text && (
+          <p className="mt-1 mb-0 text-[0.85rem] text-(--app-text-mid) italic">{bill.status_text}</p>
+        )}
+        <p className="mt-2 mb-0 text-[0.9rem] text-(--app-text-mid)">{bill.title ?? "No title yet"}</p>
       </div>
 
       <p className="mt-1 text-[0.85rem] text-(--app-text-muted)">
+        <span className={`rounded px-1.5 py-0.5 text-[0.72rem] font-semibold ${STAGE_CLASS[bill.pipeline_stage]}`}>
+          {STAGE_LABEL[bill.pipeline_stage]}
+        </span>
+        {" · "}
         {bill.originating_chamber === "H" ? "House" : "Senate"} Bill
         {" · "}
         {bill.session_year} Regular Session
@@ -135,12 +137,6 @@ export function BillDetail({ id }: { id: number }) {
           View on legis.la.gov ↗
         </BillLink>
       </p>
-
-      {bill.status_text && (
-        <p className="mt-2 border-l-[3px] border-(--app-border-light) py-1 pl-3 text-[0.88rem] text-(--app-text-mid) italic">
-          {bill.status_text}
-        </p>
-      )}
 
       {/* Committee referrals */}
       <Section label="Committee History" count={referrals.length}>

@@ -242,11 +242,11 @@ app.get('/api/bills/:id', async (c) => {
              ORDER BY bcr.referral_date`,
         ).bind(id),
         db.prepare(
-            `SELECT roll_call_id, date, chamber, description, vote_category,
+            `SELECT id AS roll_call_id, date, chamber, description, vote_category,
                     yea, nay, nv, absent, passed, margin
              FROM roll_calls
              WHERE bill_id = ?
-             ORDER BY date, roll_call_id`,
+             ORDER BY date, id`,
         ).bind(id),
     ]);
 
