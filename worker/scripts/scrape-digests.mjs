@@ -36,8 +36,9 @@ let SESSION = '26RS';
 const flags = {};
 for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    if (a === '--bill')     flags.bill = args[++i];
-    else if (a === '--out') flags.out  = args[++i];
+    if (a === '--bill')        flags.bill    = args[++i];
+    else if (a === '--out')   flags.out     = args[++i];
+    else if (a === '--refresh') flags.refresh = true;
     else if (!a.startsWith('-')) SESSION = a;
 }
 const OUT_PATH = flags.out ?? '/tmp/digests.sql';
@@ -105,7 +106,13 @@ async function parsePdfText(buf) {
     for (let i = 1; i <= doc.numPages; i++) {
         const page = await doc.getPage(i);
         const content = await page.getTextContent();
-        pages.push(content.items.map((it) => it.str).join(' '));
+        // Use hasEOL to preserve line breaks from the PDF layout.
+        let pageText = '';
+        for (const item of content.items) {
+            pageText += item.str;
+            if (item.hasEOL) pageText += '\n';
+        }
+        pages.push(pageText.trim());
     }
     return pages.join('\n');
 }
@@ -189,7 +196,7 @@ for (const bill of billRows) {
     // Take only the latest (first-listed) digest version — page renders newest first.
     const { docsId, version } = digestLinks[0];
 
-    if (existingDocsIds.has(docsId)) {
+    if (!flags.refresh && existingDocsIds.has(docsId)) {
         stats.skipped++;
         continue;
     }

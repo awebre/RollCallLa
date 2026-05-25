@@ -324,7 +324,7 @@ function DigestBody({ sections }: { sections: NonNullable<DigestSummary["section
               {chunk.label}
             </span>
           )}
-          <p className={`mt-0.5 mb-0 ${chunk.label ? "text-(--app-text-mid)" : "text-(--app-ink)"}`}>
+          <p className={`mt-0.5 mb-0 whitespace-pre-wrap ${chunk.label ? "text-(--app-text-mid)" : "text-(--app-ink)"}`}>
             {chunk.text}
           </p>
         </div>

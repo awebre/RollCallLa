@@ -31,7 +31,8 @@ export type ParsedDigest = {
 };
 
 export function parseDigestSections(fullText: string): ParsedDigest {
-    const text = fullText.replace(/\s+/g, ' ').trim();
+    // Normalize horizontal whitespace only — preserve newlines for display structure.
+    const text = fullText.replace(/[^\S\n]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
 
     let body = stripHeader(text);
 
