@@ -22,7 +22,6 @@ type DigestSummary = {
   docs_id: number;
   version: string;
   abstract: string | null;
-  full_text: string | null;
 };
 
 type Referral = {
@@ -148,7 +147,7 @@ export function BillDetail({ id }: { id: number }) {
       </p>
 
       {/* Digest */}
-      {digest && (digest.abstract || digest.full_text) && (
+      {digest && (
         <div className="mt-5">
           <div className="mb-2 flex items-center gap-3">
             <span className="text-[0.72rem] font-semibold uppercase tracking-widest text-(--app-text-muted)">
@@ -162,16 +161,14 @@ export function BillDetail({ id }: { id: number }) {
           {digest.abstract && (
             <p className="mt-0 mb-2 text-[0.9rem] text-(--app-ink) leading-relaxed">{digest.abstract}</p>
           )}
-          {digest.full_text && (
-            <details className="mt-1">
-              <summary className="cursor-pointer text-[0.8rem] text-(--app-text-muted) hover:text-(--app-ink) select-none">
-                Full digest
-              </summary>
-              <p className="mt-2 text-[0.85rem] text-(--app-text-mid) leading-relaxed whitespace-pre-wrap border-l-2 border-(--app-border-light) pl-3">
-                {digest.full_text}
-              </p>
-            </details>
-          )}
+          <a
+            href={`https://legis.la.gov/legis/ViewDocument.aspx?d=${digest.docs_id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[0.82rem] text-(--app-link-ext)"
+          >
+            Full digest (PDF) ↗
+          </a>
         </div>
       )}
 

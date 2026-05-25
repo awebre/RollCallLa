@@ -249,7 +249,7 @@ app.get('/api/bills/:id', async (c) => {
              ORDER BY date, id`,
         ).bind(id),
         db.prepare(
-            `SELECT docs_id, version, abstract, full_text
+            `SELECT docs_id, version, abstract
              FROM bill_digests
              WHERE bill_id = ?
              ORDER BY id DESC LIMIT 1`,
