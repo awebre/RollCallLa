@@ -36,6 +36,10 @@ export function parseDigestSections(fullText: string): ParsedDigest {
 
     let body = stripHeader(text);
 
+    // Strip "Summary of Amendments" section — multi-column comparison table, unreadable as plain text.
+    const summaryIdx = body.search(/\n\s*Summary\s+of\s+Amendments\b/i);
+    if (summaryIdx !== -1) body = body.slice(0, summaryIdx).trim();
+
     // Extract trailing statute citations: (Amends/Adds/Repeals/Creates/Enacts…)
     const citIdx = body.search(/\s*\((?:Amends|Adds|Repeals|Creates|Enacts|Re-creates)/i);
     const citations = citIdx !== -1 ? body.slice(citIdx).trim() : null;
