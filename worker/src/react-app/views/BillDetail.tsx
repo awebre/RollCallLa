@@ -174,7 +174,7 @@ export function BillDetail({ id }: { id: number }) {
           )}
           {digest.sections && (
             <details className="mt-1">
-              <summary className="cursor-pointer select-none text-[0.8rem] text-(--app-text-muted) hover:text-(--app-ink)">
+              <summary className="cursor-pointer select-none text-right text-[0.8rem] text-(--app-text-muted) hover:text-(--app-ink)">
                 Full breakdown
               </summary>
               <div className="mt-3">
@@ -319,13 +319,12 @@ function DigestBody({ sections }: { sections: NonNullable<DigestSummary["section
     <div className="space-y-3">
       {sections.chunks.map((chunk, i) => (
         <div key={i} className="text-[0.88rem] leading-relaxed">
-          {chunk.label && (
-            <span className={`mb-1 inline-block rounded px-1.5 py-0.5 text-[0.7rem] font-semibold ${CHUNK_LABEL_CLASS[chunk.label]}`}>
-              {chunk.label}
-            </span>
-          )}
-          <p className={`mt-0.5 mb-0 whitespace-pre-wrap ${chunk.label ? "text-(--app-text-mid)" : "text-(--app-ink)"}`}>
-            {chunk.text}
+          <p className={`mt-0 mb-0 whitespace-pre-wrap ${chunk.label ? "text-(--app-text-mid)" : "text-(--app-ink)"}`}>
+            {chunk.label && (
+              <span className={`mr-1 inline rounded px-1.5 py-0.5 text-[0.7rem] font-semibold ${CHUNK_LABEL_CLASS[chunk.label]}`}>
+                {chunk.label}
+              </span>
+            )}{chunk.text}
           </p>
         </div>
       ))}
