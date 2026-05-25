@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { admin } from './admin';
 import { fetchChamberAgenda } from './agenda';
 import { extractAbstract } from './digest-parser';
+import { generateSummary } from './ai-summary';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -273,6 +274,34 @@ app.get('/api/bills/:id', async (c) => {
         roll_calls: rollCalls.results,
         digest: digestOut,
     });
+});
+
+// ── bill AI summary ─────────────────────────────────────────────────────────
+app.get('/api/bills/:id/summary', async (c) => {
+    const db = c.env.la_vote_tracker;
+    const id = Number(c.req.param('id'));
+    if (!Number.isFinite(id)) return c.json({ error: 'bad id' }, 400);
+
+    const row = await db.prepare(
+        `SELECT bd.id, bd.abstract, bd.full_text, bd.ai_summary
+         FROM bill_digests bd
+         WHERE bd.bill_id = ?
+         ORDER BY bd.id DESC LIMIT 1`,
+    ).bind(id).first<{ id: number; abstract: string | null; full_text: string | null; ai_summary: string | null }>();
+
+    if (!row) return c.json({ summary: null });
+    if (row.ai_summary) return c.json({ summary: row.ai_summary });
+    if (!row.full_text) return c.json({ summary: null });
+
+    try {
+        const abstract = row.abstract ?? (row.full_text ? extractAbstract(row.full_text) : null);
+        const summary = await generateSummary(abstract, row.full_text, c.env);
+        await db.prepare('UPDATE bill_digests SET ai_summary = ? WHERE id = ?')
+            .bind(summary, row.id).run();
+        return c.json({ summary });
+    } catch {
+        return c.json({ summary: null, error: true });
+    }
 });
 
 // ── legislator detail ───────────────────────────────────────────────────────

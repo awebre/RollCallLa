@@ -101,6 +101,7 @@ export function BillDetail({ id }: { id: number }) {
   const [rollCalls, setRollCalls] = useState<RollCall[]>([]);
   const [digest, setDigest] = useState<DigestSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [aiSummary, setAiSummary] = useState<string | null | 'loading' | 'error'>('loading');
 
   useEffect(() => {
     setLoading(true);
@@ -113,6 +114,14 @@ export function BillDetail({ id }: { id: number }) {
         setDigest(d.digest ?? null);
       })
       .finally(() => setLoading(false));
+  }, [id]);
+
+  useEffect(() => {
+    setAiSummary('loading');
+    fetch(`/api/bills/${id}/summary`)
+      .then((r) => r.json() as Promise<{ summary: string | null; error?: boolean }>)
+      .then((d) => setAiSummary(d.summary ?? (d.error ? 'error' : null)))
+      .catch(() => setAiSummary('error'));
   }, [id]);
 
   if (loading) return <p className="text-(--app-text-muted)">Loading bill…</p>;
@@ -167,8 +176,9 @@ export function BillDetail({ id }: { id: number }) {
             <div className="flex-1 border-t border-(--app-border-light)" />
           </div>
           {digest.abstract && (
-            <p className="mt-0 mb-0 text-[0.9rem] text-(--app-ink) leading-relaxed">{digest.abstract}</p>
+            <p className="mt-0 mb-2 text-[0.9rem] text-(--app-ink) leading-relaxed">{digest.abstract}</p>
           )}
+          <AiSummary state={aiSummary} />
         </div>
       )}
 
@@ -296,6 +306,32 @@ function Section({ label, count, children }: { label: string; count: number; chi
   );
 }
 
+
+function AiSummary({ state }: { state: string | null | 'loading' | 'error' }) {
+  if (state === null) return null;
+  return (
+    <div className="mt-3 rounded border border-(--app-border-light) bg-(--app-surface-warm) px-3 py-2.5">
+      <div className="mb-1.5 flex items-center gap-1.5">
+        <span className="text-[0.65rem] font-semibold uppercase tracking-widest text-(--app-text-muted)">
+          AI Summary
+        </span>
+        <span className="rounded px-1 py-0.5 text-[0.6rem] font-semibold bg-(--app-surface-warm) text-(--app-text-subtle) border border-(--app-border-light)">
+          Workers AI
+        </span>
+        <span className="text-[0.7rem] text-(--app-text-subtle)">· additional context</span>
+      </div>
+      {state === 'loading' && (
+        <p className="m-0 text-[0.82rem] text-(--app-text-subtle) italic">Generating digest summary…</p>
+      )}
+      {state === 'error' && (
+        <p className="m-0 text-[0.82rem] text-(--app-text-subtle) italic">Summary unavailable.</p>
+      )}
+      {state !== 'loading' && state !== 'error' && (
+        <p className="m-0 text-[0.85rem] text-(--app-text-mid) leading-relaxed">{state}</p>
+      )}
+    </div>
+  );
+}
 
 function formatDate(iso: string): string {
   const [, mm, dd] = iso.split("-");
