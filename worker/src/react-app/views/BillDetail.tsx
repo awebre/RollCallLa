@@ -18,13 +18,10 @@ type BillDetail = {
   session_year: number;
 };
 
-type DigestChunk = { label: 'Present law' | 'Proposed law' | null; text: string };
-
 type DigestSummary = {
   docs_id: number;
   version: string;
   abstract: string | null;
-  sections: { chunks: DigestChunk[]; citations: string | null } | null;
 };
 
 type Referral = {
@@ -170,17 +167,7 @@ export function BillDetail({ id }: { id: number }) {
             <div className="flex-1 border-t border-(--app-border-light)" />
           </div>
           {digest.abstract && (
-            <p className="mt-0 mb-2 text-[0.9rem] text-(--app-ink) leading-relaxed">{digest.abstract}</p>
-          )}
-          {digest.sections && (
-            <details className="mt-1">
-              <summary className="cursor-pointer select-none text-center text-[0.8rem] text-(--app-text-muted) hover:text-(--app-ink)">
-                Full breakdown
-              </summary>
-              <div className="mt-3">
-                <DigestBody sections={digest.sections} />
-              </div>
-            </details>
+            <p className="mt-0 mb-0 text-[0.9rem] text-(--app-ink) leading-relaxed">{digest.abstract}</p>
           )}
         </div>
       )}
@@ -309,33 +296,6 @@ function Section({ label, count, children }: { label: string; count: number; chi
   );
 }
 
-const CHUNK_LABEL_CLASS: Record<NonNullable<DigestChunk["label"]>, string> = {
-  "Present law":  "bg-(--app-surface-warm) text-(--app-text-muted)",
-  "Proposed law": "bg-(--vote-yea)/15 text-(--vote-yea)",
-};
-
-function DigestBody({ sections }: { sections: NonNullable<DigestSummary["sections"]> }) {
-  return (
-    <div className="space-y-3 text-left">
-      {sections.chunks.map((chunk, i) => (
-        <div key={i} className="text-[0.88rem] leading-relaxed">
-          <p className={`mt-0 mb-0 whitespace-pre-wrap ${chunk.label ? "text-(--app-text-mid)" : "text-(--app-ink)"}`}>
-            {chunk.label && (
-              <span className={`mr-1 inline rounded px-1.5 py-0.5 text-[0.7rem] font-semibold ${CHUNK_LABEL_CLASS[chunk.label]}`}>
-                {chunk.label}
-              </span>
-            )}{chunk.text}
-          </p>
-        </div>
-      ))}
-      {sections.citations && (
-        <p className="mt-1 mb-0 text-[0.78rem] font-mono text-(--app-text-subtle)">
-          {sections.citations}
-        </p>
-      )}
-    </div>
-  );
-}
 
 function formatDate(iso: string): string {
   const [, mm, dd] = iso.split("-");

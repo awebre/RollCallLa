@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { admin } from './admin';
 import { fetchChamberAgenda } from './agenda';
-import { parseDigestSections, extractAbstract } from './digest-parser';
+import { extractAbstract } from './digest-parser';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -264,7 +264,6 @@ app.get('/api/bills/:id', async (c) => {
         docs_id:  rawDigest.docs_id,
         version:  rawDigest.version,
         abstract: rawDigest.full_text ? extractAbstract(rawDigest.full_text) : rawDigest.abstract,
-        sections: rawDigest.full_text ? parseDigestSections(rawDigest.full_text) : null,
     } : null;
 
     c.header('cache-control', CACHE);
