@@ -118,24 +118,20 @@ async function parsePdfText(buf) {
 function extractAbstract(fullText, billNumber) {
     const text = fullText.replace(/\s+/g, ' ').trim();
 
-    // House: explicit "Abstract:" label
+    // House: "Abstract: <one-liner>" — stop at the first section marker.
     const absIdx = text.search(/\bAbstract\s*:/i);
     if (absIdx !== -1) {
         const after = text.slice(absIdx + 'Abstract:'.length).trimStart();
-        const end = after.search(/\bPresent\s+law\b|\bThis\s+act\b|\bThis\s+bill\b/i);
-        return (end === -1 ? after.slice(0, 2000) : after.slice(0, end)).trim() || null;
+        const end = after.search(/\bPresent\s+law\b|\bProposed\s+law\b|\bThis\s+act\b|\bThis\s+bill\b/i);
+        return (end === -1 ? after.slice(0, 500) : after.slice(0, end)).trim() || null;
     }
 
-    // Senate: find "Regular Session" or "Special Session", then skip the
-    // author name (single \S+ word after session text) to reach abstract.
-    // PDF text: "... 2026 Regular Session   Jenkins Present law relative to..."
-    const sessionMatch = text.match(/(?:Regular|Special)\s+Session\s+(\S+)\s+([\s\S]{10,})/i);
+    // Senate: prose immediately follows "Session <Author> " — take up to first section marker.
+    const sessionMatch = text.match(/(?:Regular|Special)\s+Session\s+\S+\s+/i);
     if (sessionMatch) {
-        const abstract = sessionMatch[2].trim();
-        // Stop at statute citation line
-        const end = abstract.search(/\s*\((?:Amends|Adds|Repeals|Creates|Enacts)/i);
-        const candidate = (end === -1 ? abstract.slice(0, 2000) : abstract.slice(0, end)).trim();
-        return candidate.length > 20 ? candidate : null;
+        const after = text.slice(sessionMatch.index + sessionMatch[0].length).trim();
+        const end = after.search(/\bPresent\s+law\b|\bProposed\s+law\b|\((?:Amends|Adds|Repeals|Creates|Enacts)/i);
+        return (end === -1 ? after.slice(0, 500) : after.slice(0, end)).trim() || null;
     }
 
     return null;
