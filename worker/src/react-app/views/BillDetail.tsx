@@ -169,11 +169,19 @@ export function BillDetail({ id }: { id: number }) {
             </a>
             <div className="flex-1 border-t border-(--app-border-light)" />
           </div>
-          {digest.sections ? (
-            <DigestBody sections={digest.sections} />
-          ) : digest.abstract ? (
-            <p className="mt-0 text-[0.9rem] text-(--app-ink) leading-relaxed">{digest.abstract}</p>
-          ) : null}
+          {digest.abstract && (
+            <p className="mt-0 mb-2 text-[0.9rem] text-(--app-ink) leading-relaxed">{digest.abstract}</p>
+          )}
+          {digest.sections && (
+            <details className="mt-1">
+              <summary className="cursor-pointer select-none text-[0.8rem] text-(--app-text-muted) hover:text-(--app-ink)">
+                Full breakdown
+              </summary>
+              <div className="mt-3">
+                <DigestBody sections={digest.sections} />
+              </div>
+            </details>
+          )}
         </div>
       )}
 
