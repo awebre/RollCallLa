@@ -18,10 +18,13 @@ type BillDetail = {
   session_year: number;
 };
 
+type DigestChunk = { label: 'Present law' | 'Proposed law' | null; text: string };
+
 type DigestSummary = {
   docs_id: number;
   version: string;
   abstract: string | null;
+  sections: { chunks: DigestChunk[]; citations: string | null } | null;
 };
 
 type Referral = {
@@ -156,19 +159,21 @@ export function BillDetail({ id }: { id: number }) {
             <span className="rounded px-1.5 py-0.5 text-[0.72rem] font-semibold bg-(--app-surface-warm) text-(--app-text-muted)">
               {digest.version}
             </span>
+            <a
+              href={`https://legis.la.gov/legis/ViewDocument.aspx?d=${digest.docs_id}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[0.72rem] text-(--app-link-ext)"
+            >
+              PDF ↗
+            </a>
             <div className="flex-1 border-t border-(--app-border-light)" />
           </div>
-          {digest.abstract && (
-            <p className="mt-0 mb-2 text-[0.9rem] text-(--app-ink) leading-relaxed">{digest.abstract}</p>
-          )}
-          <a
-            href={`https://legis.la.gov/legis/ViewDocument.aspx?d=${digest.docs_id}`}
-            target="_blank"
-            rel="noreferrer"
-            className="text-[0.82rem] text-(--app-link-ext)"
-          >
-            Full digest (PDF) ↗
-          </a>
+          {digest.sections ? (
+            <DigestBody sections={digest.sections} />
+          ) : digest.abstract ? (
+            <p className="mt-0 text-[0.9rem] text-(--app-ink) leading-relaxed">{digest.abstract}</p>
+          ) : null}
         </div>
       )}
 
@@ -292,6 +297,35 @@ function Section({ label, count, children }: { label: string; count: number; chi
       <div className="border border-(--app-border-light)">
         {children}
       </div>
+    </div>
+  );
+}
+
+const CHUNK_LABEL_CLASS: Record<NonNullable<DigestChunk["label"]>, string> = {
+  "Present law":  "bg-(--app-surface-warm) text-(--app-text-muted)",
+  "Proposed law": "bg-(--vote-yea)/15 text-(--vote-yea)",
+};
+
+function DigestBody({ sections }: { sections: NonNullable<DigestSummary["sections"]> }) {
+  return (
+    <div className="space-y-3">
+      {sections.chunks.map((chunk, i) => (
+        <div key={i} className="text-[0.88rem] leading-relaxed">
+          {chunk.label && (
+            <span className={`mb-1 inline-block rounded px-1.5 py-0.5 text-[0.7rem] font-semibold ${CHUNK_LABEL_CLASS[chunk.label]}`}>
+              {chunk.label}
+            </span>
+          )}
+          <p className={`mt-0.5 mb-0 ${chunk.label ? "text-(--app-text-mid)" : "text-(--app-ink)"}`}>
+            {chunk.text}
+          </p>
+        </div>
+      ))}
+      {sections.citations && (
+        <p className="mt-1 mb-0 text-[0.78rem] font-mono text-(--app-text-subtle)">
+          {sections.citations}
+        </p>
+      )}
     </div>
   );
 }

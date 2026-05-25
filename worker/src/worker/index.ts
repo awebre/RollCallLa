@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { admin } from './admin';
 import { fetchChamberAgenda } from './agenda';
+import { parseDigestSections } from './digest-parser';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -249,7 +250,7 @@ app.get('/api/bills/:id', async (c) => {
              ORDER BY date, id`,
         ).bind(id),
         db.prepare(
-            `SELECT docs_id, version, abstract
+            `SELECT docs_id, version, abstract, full_text
              FROM bill_digests
              WHERE bill_id = ?
              ORDER BY id DESC LIMIT 1`,
@@ -257,12 +258,21 @@ app.get('/api/bills/:id', async (c) => {
     ]);
 
     if (bill.results.length === 0) return c.json({ error: 'not found' }, 404);
+
+    const rawDigest = digest.results[0] as { docs_id: number; version: string; abstract: string | null; full_text: string | null } | undefined;
+    const digestOut = rawDigest ? {
+        docs_id:  rawDigest.docs_id,
+        version:  rawDigest.version,
+        abstract: rawDigest.abstract,
+        sections: rawDigest.full_text ? parseDigestSections(rawDigest.full_text) : null,
+    } : null;
+
     c.header('cache-control', CACHE);
     return c.json({
         bill: bill.results[0],
         referrals: referrals.results,
         roll_calls: rollCalls.results,
-        digest: digest.results[0] ?? null,
+        digest: digestOut,
     });
 });
 
