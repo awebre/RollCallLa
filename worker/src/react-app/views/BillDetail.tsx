@@ -174,7 +174,7 @@ export function BillDetail({ id }: { id: number }) {
           )}
           {digest.sections && (
             <details className="mt-1">
-              <summary className="cursor-pointer select-none text-right text-[0.8rem] text-(--app-text-muted) hover:text-(--app-ink)">
+              <summary className="cursor-pointer select-none text-center text-[0.8rem] text-(--app-text-muted) hover:text-(--app-ink)">
                 Full breakdown
               </summary>
               <div className="mt-3">
@@ -316,7 +316,7 @@ const CHUNK_LABEL_CLASS: Record<NonNullable<DigestChunk["label"]>, string> = {
 
 function DigestBody({ sections }: { sections: NonNullable<DigestSummary["sections"]> }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 text-left">
       {sections.chunks.map((chunk, i) => (
         <div key={i} className="text-[0.88rem] leading-relaxed">
           <p className={`mt-0 mb-0 whitespace-pre-wrap ${chunk.label ? "text-(--app-text-mid)" : "text-(--app-ink)"}`}>
