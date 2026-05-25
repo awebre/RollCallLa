@@ -106,13 +106,28 @@ async function parsePdfText(buf) {
     for (let i = 1; i <= doc.numPages; i++) {
         const page = await doc.getPage(i);
         const content = await page.getTextContent();
-        // Use hasEOL to preserve line breaks from the PDF layout.
-        let pageText = '';
+        // Group items by y-coordinate so multi-column table cells on the same visual
+        // row land on the same output line. Within a row, sort by x and insert two
+        // spaces where there is a significant horizontal gap (column separator).
+        const lineMap = new Map();
         for (const item of content.items) {
-            pageText += item.str;
-            if (item.hasEOL) pageText += '\n';
+            const y = Math.round(item.transform[5]);
+            if (!lineMap.has(y)) lineMap.set(y, []);
+            lineMap.get(y).push({ x: item.transform[4], str: item.str, width: item.width ?? 0 });
         }
-        pages.push(pageText.trim());
+        const sortedYs = [...lineMap.keys()].sort((a, b) => b - a);
+        const lines = sortedYs.map((y) => {
+            const items = lineMap.get(y).sort((a, b) => a.x - b.x).filter((it) => it.str);
+            if (!items.length) return '';
+            let line = items[0].str;
+            for (let j = 1; j < items.length; j++) {
+                const gap = items[j].x - (items[j - 1].x + items[j - 1].width);
+                line += gap > 15 ? '  ' : '';
+                line += items[j].str;
+            }
+            return line.trim();
+        }).filter(Boolean);
+        pages.push(lines.join('\n'));
     }
     return pages.join('\n');
 }
