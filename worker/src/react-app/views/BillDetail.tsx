@@ -22,6 +22,7 @@ type DigestSummary = {
   docs_id: number;
   version: string;
   abstract: string | null;
+  full_text: string | null;
 };
 
 type Referral = {
@@ -146,19 +147,31 @@ export function BillDetail({ id }: { id: number }) {
         </BillLink>
       </p>
 
-      {/* Digest abstract */}
-      {digest?.abstract && (
+      {/* Digest */}
+      {digest && (digest.abstract || digest.full_text) && (
         <div className="mt-5">
           <div className="mb-2 flex items-center gap-3">
             <span className="text-[0.72rem] font-semibold uppercase tracking-widest text-(--app-text-muted)">
-              Summary
+              Digest
             </span>
             <span className="rounded px-1.5 py-0.5 text-[0.72rem] font-semibold bg-(--app-surface-warm) text-(--app-text-muted)">
               {digest.version}
             </span>
             <div className="flex-1 border-t border-(--app-border-light)" />
           </div>
-          <p className="mt-0 text-[0.9rem] text-(--app-text-mid) leading-relaxed">{digest.abstract}</p>
+          {digest.abstract && (
+            <p className="mt-0 mb-2 text-[0.9rem] text-(--app-ink) leading-relaxed">{digest.abstract}</p>
+          )}
+          {digest.full_text && (
+            <details className="mt-1">
+              <summary className="cursor-pointer text-[0.8rem] text-(--app-text-muted) hover:text-(--app-ink) select-none">
+                Full digest
+              </summary>
+              <p className="mt-2 text-[0.85rem] text-(--app-text-mid) leading-relaxed whitespace-pre-wrap border-l-2 border-(--app-border-light) pl-3">
+                {digest.full_text}
+              </p>
+            </details>
+          )}
         </div>
       )}
 

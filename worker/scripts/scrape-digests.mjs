@@ -80,15 +80,13 @@ function escSql(v) {
 }
 
 async function fetchHtml(billNumber) {
-    const cachePath = join(CACHE_DIR, `${billNumber}.html`);
-    if (existsSync(cachePath)) return readFileSync(cachePath, 'utf8');
+    // Always fetch fresh — digest versions change as bills progress through chambers.
+    // Only PDFs are skipped (via docs_id dedup in D1).
     const url = `https://legis.la.gov/legis/BillInfo.aspx?s=${SESSION}&b=${billNumber}`;
     const res = await fetch(url, { headers: { 'User-Agent': UA } });
     if (!res.ok) throw new Error(`${url} → ${res.status}`);
-    const text = await res.text();
-    writeFileSync(cachePath, text);
     await sleep(PAUSE_MS);
-    return text;
+    return res.text();
 }
 
 async function fetchPdfBuffer(docsId) {
@@ -192,8 +190,8 @@ for (const bill of billRows) {
         continue;
     }
 
-    // Take only the latest (last-listed) digest version
-    const { docsId, version } = digestLinks[digestLinks.length - 1];
+    // Take only the latest (first-listed) digest version — page renders newest first.
+    const { docsId, version } = digestLinks[0];
 
     if (existingDocsIds.has(docsId)) {
         stats.skipped++;
