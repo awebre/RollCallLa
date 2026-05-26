@@ -303,14 +303,17 @@ app.get('/api/bills/:id/summary', async (c) => {
     const abstract = row.abstract ?? extractAbstract(row.full_text);
 
     // ~350 chars = DIGEST disclaimer boilerplate + bill header line.
-    // If there's not at least 500 chars beyond the abstract, the digest has
-    // no body content worth summarising — skip rather than risk hallucination.
-    if (!abstract || (row.full_text.length - abstract.length) < 500) {
+    // Measure body length as full_text minus whatever the abstract covers;
+    // if there's not at least 500 chars of body, skip to avoid hallucination.
+    // abstract may be null (Senate bills that start directly with Present law)
+    // — those still get a summary as long as the full_text itself is substantial.
+    const digestBodyLength = row.full_text.length - (abstract?.length ?? 0);
+    if (digestBodyLength < 500) {
         return c.json({ summary: null, flagged });
     }
 
     try {
-        const summary = await generateSummary(abstract, row.full_text, c.env);
+        const summary = await generateSummary(row.full_text, c.env);
         await db.prepare('UPDATE bill_digests SET ai_summary = ? WHERE id = ?')
             .bind(summary, row.id).run();
         return c.json({ summary, flagged });

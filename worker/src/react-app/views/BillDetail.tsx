@@ -176,8 +176,22 @@ export function BillDetail({ id }: { id: number }) {
             <VersionBadge version={digest.version} />
             <div className="flex-1 border-t border-(--app-border-light)" />
           </div>
-          {digest.abstract && (
+          {digest.abstract ? (
             <p className="mt-0 mb-2 text-[0.9rem] text-(--app-ink) leading-relaxed">{digest.abstract}</p>
+          ) : (
+            <p className="mt-0 mb-2 text-[0.85rem] text-(--app-text-muted)">
+              No summary available.{' '}
+              {digest.docs_id && (
+                <a
+                  href={`https://legis.la.gov/legis/ViewDocument.aspx?d=${digest.docs_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-(--app-ink)"
+                >
+                  Read the full digest ↗
+                </a>
+              )}
+            </p>
           )}
           <AiSummary state={aiSummary} docsId={digest.docs_id} billNumber={bill.bill_number} billId={id} isAdmin={isAdmin} flagged={summaryFlagged} onFlagged={() => setSummaryFlagged(true)} />
         </div>

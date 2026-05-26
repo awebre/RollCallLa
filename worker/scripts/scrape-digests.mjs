@@ -149,9 +149,15 @@ function extractAbstract(fullText, billNumber) {
     }
 
     // Senate: prose immediately follows "Session <Author> " — take up to first section marker.
+    // Green Sheet format inserts a one-liner + standalone "DIGEST" before the abstract;
+    // skip past it if present within the first 300 chars.
     const sessionMatch = text.match(/(?:Regular|Special)\s+Session\s+\S+\s+/i);
     if (sessionMatch) {
-        const after = text.slice(sessionMatch.index + sessionMatch[0].length).trim();
+        let after = text.slice(sessionMatch.index + sessionMatch[0].length).trim();
+        const digestMarker = after.slice(0, 300).search(/\bDIGEST\b/);
+        if (digestMarker !== -1) {
+            after = after.slice(digestMarker + 'DIGEST'.length).trimStart();
+        }
         const end = after.search(/\bPresent\s+law\b|\bProposed\s+law\b|\((?:Amends|Adds|Repeals|Creates|Enacts)|\$\s*[\d,]/i);
         return (end === -1 ? after.slice(0, 500) : after.slice(0, end)).trim() || null;
     }
