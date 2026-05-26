@@ -15,6 +15,11 @@ on:
         required: true
         default: '26RS'
         type: string
+      refresh_digests:
+        description: 'Re-fetch all digest PDFs (re-extracts abstracts; slow)'
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: refresh-data
@@ -112,6 +117,15 @@ jobs:
 
       - name: Push bills to remote D1
         run: npx wrangler d1 execute la_vote_tracker --remote --file /tmp/bills.sql
+
+      - name: Scrape bill digests
+        run: |
+          node --experimental-strip-types scripts/scrape-digests.mjs "$SESSION" \
+            ${{ github.event.inputs.refresh_digests == 'true' && '--refresh' || '' }} \
+            --out /tmp/digests.sql
+
+      - name: Push digests to remote D1
+        run: npx wrangler d1 execute la_vote_tracker --remote --file /tmp/digests.sql
 
       # parse-rollcalls reads bills.docs_id from D1 to discover PDFs, so bills
       # must be pushed first. Output path matches the default OUT_PATH in the
