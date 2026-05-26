@@ -145,6 +145,14 @@ jobs:
       - name: Push per-member votes to remote D1
         run: npx wrangler d1 execute la_vote_tracker --remote --file /tmp/rollcall_votes.sql
 
+      # Digest scraper reads bills from D1 + BillInfo HTML, fetches only PDFs
+      # not yet in bill_digests (incremental). Must run after bills are pushed.
+      - name: Scrape bill digest abstracts
+        run: node --experimental-strip-types scripts/scrape-digests.mjs "$SESSION" --out /tmp/digests.sql
+
+      - name: Push bill digests to remote D1
+        run: npx wrangler d1 execute la_vote_tracker --remote --file /tmp/digests.sql
+
       - name: Scrape Wikipedia infoboxes for term_start / term_end
         run: node --experimental-strip-types scripts/scrape-wiki-terms.mjs "$SESSION" /tmp/wiki_terms.sql
 

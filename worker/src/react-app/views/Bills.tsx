@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { Bill } from "../types";
 import { useSession } from "../SessionContext";
 import { ChamberToggle } from "../components/ChamberToggle";
-import { BillLink } from "../components/BillLink";
+import { BillInternalLink } from "../components/BillInternalLink";
 
 // Vocabulary matches bills.pipeline_stage CHECK on the server.
 const STAGE_OPTIONS: { value: Bill["pipeline_stage"]; label: string }[] = [
@@ -40,7 +40,6 @@ const PAGE_SIZE = 50;
 export function Bills() {
   const { current } = useSession();
   const sessionId = current?.id ?? null;
-  const sessionName = current?.name ?? null;
 
   const [bills, setBills] = useState<Bill[]>([]);
   const [total, setTotal] = useState(0);
@@ -154,7 +153,7 @@ export function Bills() {
             {bills.map((b) => (
               <tr key={b.id} className="border-b border-(--app-border-row)">
                 <td className="px-1 py-[0.4rem] whitespace-nowrap font-semibold">
-                  <BillLink billNumber={b.bill_number} sessionName={sessionName} />
+                  <BillInternalLink id={b.id} billNumber={b.bill_number} />
                 </td>
                 <td className="px-1 py-[0.4rem] max-w-[40ch] truncate text-(--app-text-mid)" title={b.title ?? undefined}>
                   {b.title ?? <span className="text-(--app-text-subtle) italic">(no title yet)</span>}

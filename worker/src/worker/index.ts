@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
-import { admin } from './admin';
+import { admin, isAuthenticated } from './admin';
 import { fetchChamberAgenda } from './agenda';
+import { extractAbstract } from './digest-parser';
+import { generateSummary } from './ai-summary';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -215,6 +217,106 @@ app.get('/api/bills', async (c) => {
         offset,
         session_id: sessionId,
     });
+});
+
+// ── bill detail ─────────────────────────────────────────────────────────────
+app.get('/api/bills/:id', async (c) => {
+    const db = c.env.la_vote_tracker;
+    const id = Number(c.req.param('id'));
+    if (!Number.isFinite(id)) return c.json({ error: 'bad id' }, 400);
+
+    const [bill, referrals, rollCalls, digest] = await db.batch([
+        db.prepare(
+            `SELECT b.id, b.bill_number, b.bill_type, b.originating_chamber,
+                    b.title, b.docs_id, b.pipeline_stage, b.next_chamber,
+                    b.status_text, b.session_name, b.session_id,
+                    s.year AS session_year, s.name AS session_label
+             FROM bills b
+             JOIN sessions s ON s.id = b.session_id
+             WHERE b.id = ?`,
+        ).bind(id),
+        db.prepare(
+            `SELECT bcr.id AS referral_id, bcr.referral_date, bcr.discharge_date, bcr.outcome,
+                    c.id AS committee_id, c.name AS committee_name, c.chamber AS committee_chamber
+             FROM bill_committee_referrals bcr
+             JOIN committees c ON c.id = bcr.committee_id
+             WHERE bcr.bill_id = ?
+             ORDER BY bcr.referral_date`,
+        ).bind(id),
+        db.prepare(
+            `SELECT id AS roll_call_id, date, chamber, description, vote_category,
+                    yea, nay, nv, absent, passed, margin
+             FROM roll_calls
+             WHERE bill_id = ?
+             ORDER BY date, id`,
+        ).bind(id),
+        db.prepare(
+            `SELECT docs_id, version, abstract, full_text
+             FROM bill_digests
+             WHERE bill_id = ?
+             ORDER BY id DESC LIMIT 1`,
+        ).bind(id),
+    ]);
+
+    if (bill.results.length === 0) return c.json({ error: 'not found' }, 404);
+
+    const rawDigest = digest.results[0] as { docs_id: number; version: string; abstract: string | null; full_text: string | null } | undefined;
+    const digestOut = rawDigest ? {
+        docs_id:  rawDigest.docs_id,
+        version:  rawDigest.version,
+        abstract: rawDigest.full_text ? extractAbstract(rawDigest.full_text) : rawDigest.abstract,
+    } : null;
+
+    c.header('cache-control', CACHE);
+    return c.json({
+        bill: bill.results[0],
+        referrals: referrals.results,
+        roll_calls: rollCalls.results,
+        digest: digestOut,
+    });
+});
+
+// ── bill AI summary ─────────────────────────────────────────────────────────
+app.get('/api/bills/:id/summary', async (c) => {
+    if (!await isAuthenticated(c.req.raw, c.env)) return c.json({ summary: null }, 401);
+
+    const db = c.env.la_vote_tracker;
+    const id = Number(c.req.param('id'));
+    if (!Number.isFinite(id)) return c.json({ error: 'bad id' }, 400);
+
+    const row = await db.prepare(
+        `SELECT bd.id, bd.abstract, bd.full_text, bd.ai_summary
+         FROM bill_digests bd
+         WHERE bd.bill_id = ?
+         ORDER BY bd.id DESC LIMIT 1`,
+    ).bind(id).first<{ id: number; abstract: string | null; full_text: string | null; ai_summary: string | null }>();
+
+    const flagRow = await db.prepare(
+        `SELECT id FROM feedback WHERE category = 'ai_summary' AND bill_id = ? AND status NOT IN ('addressed', 'dismissed') LIMIT 1`,
+    ).bind(id).first();
+    const flagged = !!flagRow;
+
+    if (!row) return c.json({ summary: null, flagged });
+    if (row.ai_summary) return c.json({ summary: row.ai_summary, flagged });
+    if (!row.full_text) return c.json({ summary: null, flagged });
+
+    const abstract = row.abstract ?? extractAbstract(row.full_text);
+
+    // ~350 chars = DIGEST disclaimer boilerplate + bill header line.
+    // If there's not at least 500 chars beyond the abstract, the digest has
+    // no body content worth summarising — skip rather than risk hallucination.
+    if (!abstract || (row.full_text.length - abstract.length) < 500) {
+        return c.json({ summary: null, flagged });
+    }
+
+    try {
+        const summary = await generateSummary(abstract, row.full_text, c.env);
+        await db.prepare('UPDATE bill_digests SET ai_summary = ? WHERE id = ?')
+            .bind(summary, row.id).run();
+        return c.json({ summary, flagged });
+    } catch {
+        return c.json({ summary: null, flagged, error: true });
+    }
 });
 
 // ── legislator detail ───────────────────────────────────────────────────────

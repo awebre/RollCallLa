@@ -5,7 +5,7 @@ import type { Committee } from "../types";
 import { COMMITTEE_ROLE_LABEL } from "../types";
 import { formatName, partyColor } from "../types";
 import { ChamberToggle } from "../components/ChamberToggle";
-import { BillLink } from "../components/BillLink";
+import { BillInternalLink } from "../components/BillInternalLink";
 
 type CommitteeMember = {
   role: string;
@@ -176,7 +176,6 @@ function chairName(c: Committee): string {
 function CommitteeDetailView({ id }: { id: number }) {
   const { current } = useSession();
   const sessionId = current?.id ?? null;
-  const sessionName = current?.name ?? null;
   const [data, setData] = useState<CommitteeDetail | null>(null);
   const [referrals, setReferrals] = useState<CommitteeReferral[]>([]);
   const [loading, setLoading] = useState(true);
@@ -310,7 +309,7 @@ function CommitteeDetailView({ id }: { id: number }) {
                   </thead>
                   <tbody className="divide-y divide-(--app-border-row)">
                     {filtered.map((r) => (
-                      <ReferralRow key={r.referral_id} referral={r} sessionName={sessionName} />
+                      <ReferralRow key={r.referral_id} referral={r} />
                     ))}
                   </tbody>
                 </table>
@@ -348,11 +347,11 @@ function Section({ label, count, total, children }: { label: string; count: numb
   );
 }
 
-function ReferralRow({ referral: r, sessionName }: { referral: CommitteeReferral; sessionName: string | null }) {
+function ReferralRow({ referral: r }: { referral: CommitteeReferral }) {
   return (
     <tr className="hover:bg-(--app-surface-warm)">
       <td className="px-3 py-2.5 font-mono font-semibold">
-        <BillLink billNumber={r.bill_number} sessionName={sessionName} />
+        <BillInternalLink id={r.bill_id} billNumber={r.bill_number} />
       </td>
       <td className="px-3 py-2.5 text-(--app-text-mid)">
         <span className="line-clamp-1">{r.title ?? "—"}</span>

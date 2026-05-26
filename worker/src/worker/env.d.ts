@@ -6,6 +6,8 @@ interface Env {
     SEND_EMAIL?: SendEmail;
     SESSION_SECRET: string;
     RP_ID?: string;
+    AI: Ai;
+    AI_GATEWAY_ID?: string;
 }
 
 interface SendEmail {

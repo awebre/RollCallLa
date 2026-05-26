@@ -14,9 +14,15 @@ export const admin = new Hono<{ Bindings: AdminEnv }>();
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 function getRpInfo(req: Request, env: AdminEnv): { rpID: string; origin: string } {
-    const rpID = env.RP_ID ?? new URL(req.url).hostname;
-    const scheme = rpID === 'localhost' || rpID.startsWith('127.') ? 'http' : 'https';
-    return { rpID, origin: `${scheme}://${rpID}` };
+    // DevTunnel (and other proxies) rewrite the Origin header to the internal
+    // address, so prefer X-Forwarded-Host/Proto to reconstruct the real origin.
+    const forwardedHost = req.headers.get('x-forwarded-host');
+    const forwardedProto = req.headers.get('x-forwarded-proto');
+    const origin = forwardedHost
+        ? `${forwardedProto ?? 'https'}://${forwardedHost}`
+        : (req.headers.get('origin') ?? new URL(req.url).origin);
+    const rpID = env.RP_ID ?? new URL(origin).hostname;
+    return { rpID, origin };
 }
 
 async function sign(payload: string, secret: string): Promise<string> {
@@ -83,6 +89,12 @@ async function requireSetupToken(c: { req: { raw: Request }; env: AdminEnv }, ne
     const storedDigest = Uint8Array.from(atob(row.token_hash), (ch) => ch.charCodeAt(0)).buffer;
     if (!timingSafeEqual(providedDigest, storedDigest)) return Response.json({ error: 'forbidden' }, { status: 403 });
     return next();
+}
+
+export async function isAuthenticated(req: Request, env: AdminEnv): Promise<boolean> {
+    const token = getSessionToken(req);
+    if (!token || !env.SESSION_SECRET) return false;
+    return verifySessionCookie(token, env.SESSION_SECRET);
 }
 
 async function requireSession(c: { req: { raw: Request }; env: AdminEnv }, next: () => Promise<Response>): Promise<Response> {
@@ -155,15 +167,35 @@ admin.post('/setup/verify', async (c) => {
     const body = await c.req.json<RegistrationResponseJSON>();
     const { rpID, origin } = getRpInfo(c.req.raw, c.env);
 
-    const { verified, registrationInfo } = await verifyRegistrationResponse({
-        response: body,
-        expectedChallenge: challenge,
-        expectedOrigin: origin,
-        expectedRPID: rpID,
-        requireUserVerification: true,
-    });
+    let verified: boolean;
+    let registrationInfo: Awaited<ReturnType<typeof verifyRegistrationResponse>>['registrationInfo'];
+    try {
+        ({ verified, registrationInfo } = await verifyRegistrationResponse({
+            response: body,
+            expectedChallenge: challenge,
+            expectedOrigin: origin,
+            expectedRPID: rpID,
+            requireUserVerification: true,
+        }));
+    } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        const req = c.req.raw;
+        console.error('[admin/setup/verify] verifyRegistrationResponse threw:', msg, {
+            rpID,
+            origin,
+            reqUrl: req.url,
+            headerOrigin: req.headers.get('origin'),
+            headerHost: req.headers.get('host'),
+            headerForwardedHost: req.headers.get('x-forwarded-host'),
+            headerForwardedProto: req.headers.get('x-forwarded-proto'),
+        });
+        return c.json({ error: 'verification failed' }, 400);
+    }
 
-    if (!verified || !registrationInfo) return c.json({ error: 'verification failed' }, 400);
+    if (!verified || !registrationInfo) {
+        console.error('[admin/setup/verify] verified=false', { rpID, origin });
+        return c.json({ error: 'verification failed' }, 400);
+    }
 
     const { credential } = registrationInfo;
     const publicKeyB64 = btoa(String.fromCharCode(...credential.publicKey));
@@ -319,6 +351,35 @@ admin.delete('/agenda-cache', async (c) => {
         }),
     );
     return c.json({ ok: true, results });
+});
+
+admin.post('/flag-summary', async (c) => {
+    const sessionRes = await requireSession(
+        { req: { raw: c.req.raw }, env: c.env },
+        async () => Response.json({ ok: true }),
+    );
+    if (!sessionRes.ok) return sessionRes;
+
+    const { billId, billNumber, summary, docsId, note } = await c.req.json<{
+        billId?: number;
+        billNumber?: string;
+        summary?: string;
+        docsId?: number | null;
+        note?: string;
+    }>();
+    if (!summary?.trim()) return c.json({ error: 'missing summary' }, 400);
+
+    const noteLine = note?.trim() ? `\n\nNote: ${note.trim()}` : '';
+    const digestLine = docsId
+        ? `\n\nDigest: https://legis.la.gov/legis/ViewDocument.aspx?d=${docsId}`
+        : '';
+    const description = `AI summary flagged for review${billNumber ? ` (${billNumber})` : ''}.${noteLine}\n\nSummary:\n${summary.trim()}${digestLine}`;
+
+    await c.env.la_vote_tracker.prepare(
+        `INSERT INTO feedback (category, description, email, bill_id) VALUES (?, ?, ?, ?)`,
+    ).bind('ai_summary', description, null, billId ?? null).run();
+
+    return c.json({ ok: true });
 });
 
 admin.patch('/feedback/:id', async (c) => {
