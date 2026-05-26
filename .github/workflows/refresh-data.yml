@@ -15,6 +15,11 @@ on:
         required: true
         default: '26RS'
         type: string
+      refresh_digests:
+        description: 'Re-fetch all digest PDFs (re-extracts abstracts; slow)'
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: refresh-data
@@ -148,7 +153,10 @@ jobs:
       # Digest scraper reads bills from D1 + BillInfo HTML, fetches only PDFs
       # not yet in bill_digests (incremental). Must run after bills are pushed.
       - name: Scrape bill digest abstracts
-        run: node --experimental-strip-types scripts/scrape-digests.mjs "$SESSION" --out /tmp/digests.sql
+        run: |
+          node --experimental-strip-types scripts/scrape-digests.mjs "$SESSION" \
+            ${{ inputs.refresh_digests == true && '--refresh' || '' }} \
+            --out /tmp/digests.sql
 
       - name: Push bill digests to remote D1
         run: npx wrangler d1 execute la_vote_tracker --remote --file /tmp/digests.sql
