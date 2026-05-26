@@ -13,7 +13,7 @@ export function extractAbstract(fullText: string): string | null {
     const sessionMatch = text.match(/(?:Regular|Special)\s+Session\s+\S+\s+/i);
     if (sessionMatch) {
         const after = text.slice(sessionMatch.index! + sessionMatch[0].length).trim();
-        const end = after.search(/\bPresent\s+law\b|\bProposed\s+law\b|\((?:Amends|Adds|Repeals|Creates|Enacts)/i);
+        const end = after.search(/\bPresent\s+law\b|\bProposed\s+law\b|\((?:Amends|Adds|Repeals|Creates|Enacts)|\$\s*[\d,]/i);
         return (end === -1 ? after.slice(0, 500) : after.slice(0, end)).trim() || null;
     }
 

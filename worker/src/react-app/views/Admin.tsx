@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
+import { useAdmin } from '../AdminContext';
 
 type AdminState = 'loading' | 'setup' | 'login' | 'dashboard';
 
@@ -11,6 +12,14 @@ type FeedbackRow = {
     status: string;
     created_at: string;
     updated_at: string;
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+    representative: 'Representative info',
+    vote: 'Vote info',
+    bill: 'Bill info',
+    map: 'Map / boundary',
+    ai_summary: 'AI Summary',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -28,6 +37,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function AdminView() {
+    const { refresh: refreshAdminContext } = useAdmin();
     const [state, setState] = useState<AdminState>('loading');
     const [setupToken, setSetupToken] = useState('');
     const [feedback, setFeedback] = useState<FeedbackRow[]>([]);
@@ -91,7 +101,10 @@ export function AdminView() {
                 },
                 body: JSON.stringify(credential),
             });
-            if (!res.ok) throw new Error('Passkey registration failed');
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({})) as Record<string, unknown>;
+                throw new Error(`Passkey registration failed (${res.status}): ${body.error ?? body.message ?? 'unknown'}`);
+            }
 
             setState('login');
         } catch (e) {
@@ -124,6 +137,7 @@ export function AdminView() {
             });
             if (!res.ok) throw new Error('Authentication failed');
 
+            await refreshAdminContext();
             setState('dashboard');
             loadFeedback('new');
             loadCounts();
@@ -172,6 +186,8 @@ export function AdminView() {
                     onChange={(e) => setSetupToken(e.target.value)}
                     className="w-full border border-(--app-ink)/30 rounded px-3 py-2 mb-4 text-sm font-mono bg-(--app-bg)"
                     placeholder="ADMIN_SETUP_TOKEN value"
+                    autoComplete="off"
+                    data-1p-ignore
                 />
                 {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
                 <button
@@ -244,7 +260,7 @@ export function AdminView() {
                             <div className="flex items-start justify-between gap-4 mb-2">
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <span className="text-xs font-medium uppercase tracking-wide text-(--app-subtitle)">
-                                        {row.category}
+                                        {CATEGORY_LABELS[row.category] ?? row.category}
                                     </span>
                                     <span
                                         className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_COLORS[row.status] ?? ''}`}

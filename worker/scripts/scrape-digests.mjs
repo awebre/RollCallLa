@@ -152,7 +152,7 @@ function extractAbstract(fullText, billNumber) {
     const sessionMatch = text.match(/(?:Regular|Special)\s+Session\s+\S+\s+/i);
     if (sessionMatch) {
         const after = text.slice(sessionMatch.index + sessionMatch[0].length).trim();
-        const end = after.search(/\bPresent\s+law\b|\bProposed\s+law\b|\((?:Amends|Adds|Repeals|Creates|Enacts)/i);
+        const end = after.search(/\bPresent\s+law\b|\bProposed\s+law\b|\((?:Amends|Adds|Repeals|Creates|Enacts)|\$\s*[\d,]/i);
         return (end === -1 ? after.slice(0, 500) : after.slice(0, end)).trim() || null;
     }
 
@@ -170,13 +170,22 @@ function parseDigestLinks(html, billNumber) {
     while ((m = re.exec(html)) !== null) {
         const docsId = Number(m[1]);
         const label  = m[2].trim();
-        // Only want digest links (contain "Digest of <billNumber>")
+        // Only want digest links (contain "Digest" and the bill number)
         if (!label.toLowerCase().includes('digest')) continue;
-        // Extract version: last word(s) after bill number in label
-        const versionMatch = label.match(
+        if (!label.toLowerCase().includes(billNumber.toLowerCase())) continue;
+        // "Digest of HB2 Engrossed" → "Engrossed"
+        const suffixMatch = label.match(
             new RegExp(`Digest\\s+of\\s+${billNumber}\\s+(.+)`, 'i'),
         );
-        const version = versionMatch ? versionMatch[1].trim() : label;
+        // "Senate Green Sheet Digest for HB2 [11]" → "Senate Green Sheet"
+        const prefixMatch = label.match(
+            new RegExp(`^(.+?)\\s+Digest\\s+(?:for|of)\\s+${billNumber}`, 'i'),
+        );
+        const version = suffixMatch
+            ? suffixMatch[1].trim()
+            : prefixMatch
+            ? prefixMatch[1].trim()
+            : label;
         results.push({ docsId, version });
     }
     return results;

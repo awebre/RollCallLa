@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { BillLink } from "../components/BillLink";
+import { Tooltip } from "../components/Tooltip";
+import { useAdmin } from "../AdminContext";
 import { resultColorClass } from "../style/color-classes";
 import type { Bill } from "../types";
 
@@ -96,12 +98,14 @@ const VOTE_CATEGORY_LABEL: Record<string, string> = {
 };
 
 export function BillDetail({ id }: { id: number }) {
+  const { isAdmin, loading: adminLoading } = useAdmin();
   const [bill, setBill] = useState<BillDetail | null>(null);
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [rollCalls, setRollCalls] = useState<RollCall[]>([]);
   const [digest, setDigest] = useState<DigestSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [aiSummary, setAiSummary] = useState<string | null | 'loading' | 'error'>('loading');
+  const [aiSummary, setAiSummary] = useState<string | null | 'loading' | 'error'>(null);
+  const [summaryFlagged, setSummaryFlagged] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -117,12 +121,19 @@ export function BillDetail({ id }: { id: number }) {
   }, [id]);
 
   useEffect(() => {
+    if (adminLoading || !isAdmin) return;
     setAiSummary('loading');
+    setSummaryFlagged(false);
     fetch(`/api/bills/${id}/summary`)
-      .then((r) => r.json() as Promise<{ summary: string | null; error?: boolean }>)
-      .then((d) => setAiSummary(d.summary ?? (d.error ? 'error' : null)))
+      .then((r) => {
+        if (!r.ok) return setAiSummary(r.status === 401 ? null : 'error');
+        return r.json().then((d: { summary: string | null; flagged: boolean; error?: boolean }) => {
+          setAiSummary(d.summary ?? (d.error ? 'error' : null));
+          setSummaryFlagged(d.flagged ?? false);
+        });
+      })
       .catch(() => setAiSummary('error'));
-  }, [id]);
+  }, [id, isAdmin, adminLoading]);
 
   if (loading) return <p className="text-(--app-text-muted)">Loading bill…</p>;
   if (!bill) return <p className="text-(--app-text-muted)">Bill not found.</p>;
@@ -160,25 +171,15 @@ export function BillDetail({ id }: { id: number }) {
         <div className="mt-5">
           <div className="mb-2 flex items-center gap-3">
             <span className="text-[0.72rem] font-semibold uppercase tracking-widest text-(--app-text-muted)">
-              Digest
+              Abstract
             </span>
-            <span className="rounded px-1.5 py-0.5 text-[0.72rem] font-semibold bg-(--app-surface-warm) text-(--app-text-muted)">
-              {digest.version}
-            </span>
-            <a
-              href={`https://legis.la.gov/legis/ViewDocument.aspx?d=${digest.docs_id}`}
-              target="_blank"
-              rel="noreferrer"
-              className="text-[0.72rem] text-(--app-link-ext)"
-            >
-              PDF ↗
-            </a>
+            <VersionBadge version={digest.version} />
             <div className="flex-1 border-t border-(--app-border-light)" />
           </div>
           {digest.abstract && (
             <p className="mt-0 mb-2 text-[0.9rem] text-(--app-ink) leading-relaxed">{digest.abstract}</p>
           )}
-          <AiSummary state={aiSummary} />
+          <AiSummary state={aiSummary} docsId={digest.docs_id} billNumber={bill.bill_number} billId={id} isAdmin={isAdmin} flagged={summaryFlagged} onFlagged={() => setSummaryFlagged(true)} />
         </div>
       )}
 
@@ -307,18 +308,84 @@ function Section({ label, count, children }: { label: string; count: number; chi
 }
 
 
-function AiSummary({ state }: { state: string | null | 'loading' | 'error' }) {
+const VERSION_TOOLTIP = `Digests are re-issued each time a bill is substantially amended.
+
+Original — first version as introduced
+Engrossed — passed the originating chamber (with any amendments)
+Reengrossed — further amended after engrossment
+Enrolled — final version passed by both chambers
+Senate Green Sheet — Senate committee analysis version`;
+
+function VersionBadge({ version }: { version: string }) {
+  return (
+    <Tooltip content={VERSION_TOOLTIP}>
+      <span className="rounded px-1.5 py-0.5 text-[0.72rem] font-semibold bg-(--app-surface-warm) text-(--app-text-muted)">
+        {version}
+      </span>
+    </Tooltip>
+  );
+}
+
+function AiSummary({
+  state,
+  docsId,
+  billNumber,
+  billId,
+  isAdmin,
+  flagged,
+  onFlagged,
+}: {
+  state: string | null | 'loading' | 'error';
+  docsId: number | null;
+  billNumber: string;
+  billId: number;
+  isAdmin: boolean;
+  flagged: boolean;
+  onFlagged: () => void;
+}) {
+  const [flagState, setFlagState] = useState<'idle' | 'expanded' | 'submitting' | 'error'>('idle');
+  const [flagNote, setFlagNote] = useState('');
+
   if (state === null) return null;
+
+  async function submitFlag() {
+    if (typeof state !== 'string' || flagState === 'submitting') return;
+    setFlagState('submitting');
+    try {
+      const res = await fetch('/api/admin/flag-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ billId, billNumber, summary: state, docsId, note: flagNote.trim() || undefined }),
+      });
+      if (res.ok) { onFlagged(); setFlagState('idle'); setFlagNote(''); }
+      else setFlagState('error');
+    } catch {
+      setFlagState('error');
+    }
+  }
+
   return (
     <div className="mt-3 rounded border border-(--app-border-light) bg-(--app-surface-warm) px-3 py-2.5">
-      <div className="mb-1.5 flex items-center gap-1.5">
-        <span className="text-[0.65rem] font-semibold uppercase tracking-widest text-(--app-text-muted)">
-          AI Summary
-        </span>
-        <span className="rounded px-1 py-0.5 text-[0.6rem] font-semibold bg-(--app-surface-warm) text-(--app-text-subtle) border border-(--app-border-light)">
-          Workers AI
-        </span>
-        <span className="text-[0.7rem] text-(--app-text-subtle)">· additional context</span>
+      <div className="mb-1.5 flex items-center justify-between gap-1.5">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[0.65rem] font-semibold uppercase tracking-widest text-(--app-text-muted)">
+            AI Summary
+          </span>
+          <span className="text-[0.7rem] text-(--app-text-subtle)">· summary of the bill's digest, may contain errors</span>
+        </div>
+        {isAdmin && state !== 'error' && state !== 'loading' && (
+          flagged ? (
+            <span className="text-[0.65rem] text-amber-600">Flagged for review</span>
+          ) : flagState !== 'expanded' && (
+            <button
+              onClick={() => flagState === 'idle' && setFlagState('expanded')}
+              disabled={flagState !== 'idle'}
+              className="text-[0.65rem] text-(--app-text-muted) hover:text-red-600 disabled:opacity-50 disabled:cursor-default cursor-pointer bg-transparent border-none p-0 font-inherit"
+            >
+              {flagState === 'error' ? 'Error — retry?' : 'Flag for review'}
+            </button>
+          )
+        )}
       </div>
       {state === 'loading' && (
         <p className="m-0 text-[0.82rem] text-(--app-text-subtle) italic">Generating digest summary…</p>
@@ -328,6 +395,44 @@ function AiSummary({ state }: { state: string | null | 'loading' | 'error' }) {
       )}
       {state !== 'loading' && state !== 'error' && (
         <p className="m-0 text-[0.85rem] text-(--app-text-mid) leading-relaxed">{state}</p>
+      )}
+      {flagState === 'expanded' && (
+        <div className="mt-2.5 border-t border-(--app-border-light) pt-2.5">
+          <textarea
+            autoFocus
+            value={flagNote}
+            onChange={(e) => setFlagNote(e.target.value)}
+            placeholder="What's wrong with this summary? (optional)"
+            className="w-full resize-none rounded border border-(--app-border-input) bg-(--app-bg) px-2 py-1.5 text-[0.82rem] text-(--app-ink) placeholder:text-(--app-text-subtle) focus:outline-none"
+            rows={2}
+          />
+          <div className="mt-1.5 flex justify-end gap-3">
+            <button
+              onClick={() => { setFlagState('idle'); setFlagNote(''); }}
+              className="text-[0.72rem] text-(--app-text-muted) hover:text-(--app-ink) cursor-pointer bg-transparent border-none p-0 font-inherit"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={submitFlag}
+              className="text-[0.72rem] font-medium text-red-600 hover:text-red-700 cursor-pointer bg-transparent border-none p-0 font-inherit"
+            >
+              Submit flag
+            </button>
+          </div>
+        </div>
+      )}
+      {docsId && (
+        <div className="mt-2.5 flex justify-end border-t border-(--app-border-light) pt-2">
+          <a
+            href={`https://legis.la.gov/legis/ViewDocument.aspx?d=${docsId}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[0.8rem] font-medium text-(--app-link-ext) no-underline hover:underline"
+          >
+            Read full digest (PDF) ↗
+          </a>
+        </div>
       )}
     </div>
   );

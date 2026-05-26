@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { admin } from './admin';
+import { admin, isAuthenticated } from './admin';
 import { fetchChamberAgenda } from './agenda';
 import { extractAbstract } from './digest-parser';
 import { generateSummary } from './ai-summary';
@@ -278,6 +278,8 @@ app.get('/api/bills/:id', async (c) => {
 
 // ── bill AI summary ─────────────────────────────────────────────────────────
 app.get('/api/bills/:id/summary', async (c) => {
+    if (!await isAuthenticated(c.req.raw, c.env)) return c.json({ summary: null }, 401);
+
     const db = c.env.la_vote_tracker;
     const id = Number(c.req.param('id'));
     if (!Number.isFinite(id)) return c.json({ error: 'bad id' }, 400);
@@ -289,18 +291,31 @@ app.get('/api/bills/:id/summary', async (c) => {
          ORDER BY bd.id DESC LIMIT 1`,
     ).bind(id).first<{ id: number; abstract: string | null; full_text: string | null; ai_summary: string | null }>();
 
-    if (!row) return c.json({ summary: null });
-    if (row.ai_summary) return c.json({ summary: row.ai_summary });
-    if (!row.full_text) return c.json({ summary: null });
+    const flagRow = await db.prepare(
+        `SELECT id FROM feedback WHERE category = 'ai_summary' AND bill_id = ? AND status NOT IN ('addressed', 'dismissed') LIMIT 1`,
+    ).bind(id).first();
+    const flagged = !!flagRow;
+
+    if (!row) return c.json({ summary: null, flagged });
+    if (row.ai_summary) return c.json({ summary: row.ai_summary, flagged });
+    if (!row.full_text) return c.json({ summary: null, flagged });
+
+    const abstract = row.abstract ?? extractAbstract(row.full_text);
+
+    // ~350 chars = DIGEST disclaimer boilerplate + bill header line.
+    // If there's not at least 500 chars beyond the abstract, the digest has
+    // no body content worth summarising — skip rather than risk hallucination.
+    if (!abstract || (row.full_text.length - abstract.length) < 500) {
+        return c.json({ summary: null, flagged });
+    }
 
     try {
-        const abstract = row.abstract ?? (row.full_text ? extractAbstract(row.full_text) : null);
         const summary = await generateSummary(abstract, row.full_text, c.env);
         await db.prepare('UPDATE bill_digests SET ai_summary = ? WHERE id = ?')
             .bind(summary, row.id).run();
-        return c.json({ summary });
+        return c.json({ summary, flagged });
     } catch {
-        return c.json({ summary: null, error: true });
+        return c.json({ summary: null, flagged, error: true });
     }
 });
 

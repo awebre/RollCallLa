@@ -12,6 +12,7 @@ import {
   partyColorClass,
   resultColorClass,
 } from "../style/color-classes";
+import { Tooltip, TooltipIcon } from "../components/Tooltip";
 import { ChamberAgenda } from "../components/ChamberAgenda";
 
 type Profile = {
@@ -346,13 +347,8 @@ function Stat({ label, value, help }: { label: string; value: number | string; h
 
 function StatHelp({ text }: { text: string }) {
   return (
-    <span className="group relative inline-flex">
-      <span className="inline-flex h-3.5 w-3.5 cursor-default items-center justify-center rounded-full border border-(--app-border-input) text-[0.6rem] leading-none text-(--app-text-muted)">
-        ?
-      </span>
-      <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 w-56 -translate-x-1/2 rounded border border-(--app-border-light) bg-(--app-surface-warm) p-2 text-[0.75rem] leading-snug normal-case tracking-normal text-(--app-ink) shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
-        {text}
-      </span>
-    </span>
+    <Tooltip content={text}>
+      <TooltipIcon />
+    </Tooltip>
   );
 }
